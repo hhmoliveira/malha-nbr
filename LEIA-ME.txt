@@ -1,0 +1,25 @@
+MALHA DE MEDIÇÃO NBR 5101 — PASTA PARA PUBLICAR (GitHub Pages)
+
+ARQUIVOS (todos na raiz do repositório, sem subpasta extra):
+  index.html   a ferramenta
+  manifest.json, sw.js, .nojekyll, icons/ (3 imagens)
+
+PUBLICAR NO GITHUB
+1. github.com > "+" > New repository. Nome: malha-nbr5101. Marque Public. Create.
+2. "uploading an existing file" > arraste TODO o conteúdo descompactado do zip
+   (inclusive a pasta icons e o arquivo .nojekyll) > Commit changes.
+3. Settings > Pages > Source: "Deploy from a branch" > Branch: main, pasta /(root) > Save.
+4. Em 1 a 2 minutos aparece o endereço:  https://SEU-USUARIO.github.io/malha-nbr5101/
+
+INSTALAR NO CELULAR (Galaxy A32, Chrome)
+1. Abra o endereço no Chrome, COM internet, e espere carregar por inteiro.
+2. Menu (3 pontos) > "Instalar app" (ou "Adicionar à tela inicial").
+3. Abra pelo ícone. Desligue o Wi-Fi/dados e abra de novo para testar o uso offline.
+
+ATUALIZAR DEPOIS
+Troque o index.html no repositório e altere VERSAO em sw.js (ex.: malha-nbr5101-v2).
+No celular, abra o app com internet e feche/abra duas vezes.
+
+ATENÇÃO
+- Repositório público: qualquer pessoa com o link vê a ferramenta (não ficam dados seus nela;
+  as medições ficam só no navegador do celular). Não escreva chave de API no arquivo.

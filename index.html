@@ -1,0 +1,2728 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d4f83">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Malha NBR 5101">
+<title>Malha de Medição NBR 5101 (leve)</title>
+<style>
+/* Layout: ferramenta de campo em coluna única; levantamentos → configuração → malha → resumo → registros; barra de progresso fixa no topo */
+:root{
+  --brand:#1769aa; --brand-2:#0d4f83; --via:#f57c00; --ped:#1976d2; --ok:#159447; --bad:#c62f2f; --warn:#a86400;
+  --bg:#f1f4f7; --surface:#ffffff; --surface-2:#eaf0f5; --line:#d3dde6; --fg:#1b2833; --muted:#5a6a78; --on-brand:#ffffff;
+  --asphalt:#33383e; --walk:#cfd6db; --walkjoint:#b5bfc6; --verge:#b3c2a3; --curb:#8e9ba5; --mark:#eef1f3;
+  --ok-bg:#e2f4e9; --bad-bg:#fbe6e6; --warn-bg:#fff0dc; --sel-bg:#e3eef8;
+  --f-ui:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --f-num:ui-monospace,"SF Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --brand:#4b9be0; --brand-2:#123a5c; --via:#ff9a3c; --ped:#5aa7f0; --ok:#3cc57a; --bad:#ef6464; --warn:#e8a64a;
+  --bg:#0f151b; --surface:#17202a; --surface-2:#1e2935; --line:#2c3a48; --fg:#e2e9ef; --muted:#93a3b1; --on-brand:#ffffff;
+  --asphalt:#24282d; --walk:#4b555d; --walkjoint:#3e474e; --verge:#3d4b36; --curb:#6b7883; --mark:#cfd5da;
+  --ok-bg:#15331f; --bad-bg:#3a1a1a; --warn-bg:#3a2a12; --sel-bg:#16324d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --brand:#4b9be0; --brand-2:#123a5c; --via:#ff9a3c; --ped:#5aa7f0; --ok:#3cc57a; --bad:#ef6464; --warn:#e8a64a;
+  --bg:#0f151b; --surface:#17202a; --surface-2:#1e2935; --line:#2c3a48; --fg:#e2e9ef; --muted:#93a3b1; --on-brand:#ffffff;
+  --asphalt:#24282d; --walk:#4b555d; --walkjoint:#3e474e; --verge:#3d4b36; --curb:#6b7883; --mark:#cfd5da;
+  --ok-bg:#15331f; --bad-bg:#3a1a1a; --warn-bg:#3a2a12; --sel-bg:#16324d; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font:15px/1.45 var(--f-ui);background:var(--bg);color:var(--fg)}
+header.top{background:var(--brand-2);color:var(--on-brand);padding:16px 16px 14px;padding-top:calc(16px + env(safe-area-inset-top,0px))}
+header.top h1{margin:0;font-size:1.25rem;letter-spacing:.01em}
+header.top p{margin:2px 0 0;opacity:.85;font-size:.85rem}
+.progress{position:sticky;top:0;z-index:10;background:var(--surface);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.progress .bar{flex:1 1 160px;height:8px;border-radius:8px;background:var(--surface-2);overflow:hidden;min-width:120px}
+.progress .bar i{display:block;height:100%;width:0;background:var(--ok);transition:width .25s}
+.progress .count{font:600 .9rem var(--f-num);font-variant-numeric:tabular-nums;white-space:nowrap}
+.progress .saved{font-size:.78rem;color:var(--muted);white-space:nowrap}
+main{max-width:1180px;margin:0 auto;padding:16px;display:grid;gap:16px}
+section.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+h2{font-size:1.02rem;margin:0 0 12px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+h2 .step{font:700 .75rem var(--f-num);color:var(--brand);letter-spacing:.06em}
+h3{font-size:.8rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:14px 0 8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.fld label,.fld-lbl{font-size:.78rem;font-weight:700;display:block;margin-bottom:4px;color:var(--muted)}
+input,select,button{font:inherit;color:inherit}
+input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);min-height:44px}
+input:focus-visible,select:focus-visible,button:focus-visible,.btn:focus-visible,.pt:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+textarea{width:100%;min-height:96px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font:inherit;color:inherit;resize:vertical}
+textarea:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+select:disabled,input:disabled,button:disabled{opacity:.5}
+input.auto,select.auto,.seg.auto{border-color:var(--ok);box-shadow:0 0 0 2px var(--ok-bg)}
+.seg{position:relative;display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:8px;overflow:hidden;min-height:44px}
+.seg input{position:absolute;opacity:0;width:1px;height:1px;min-height:0}
+.seg label{display:flex;align-items:center;justify-content:center;text-align:center;padding:6px 4px;font-size:.8rem;font-weight:600;cursor:pointer;border-left:1px solid var(--line);color:var(--fg);margin:0}
+.seg label:first-of-type{border-left:0}
+.seg input:checked+label{background:var(--brand);color:var(--on-brand)}
+.seg input:focus-visible+label{outline:3px solid var(--brand);outline-offset:-3px}
+.span2{grid-column:span 2}
+@media (max-width:420px){.span2{grid-column:1/-1}}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.btn,button.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:10px 16px;border-radius:8px;border:1px solid transparent;font-weight:700;cursor:pointer;text-align:center;user-select:none}
+.btn.primary{background:var(--brand);color:var(--on-brand)}
+.btn.accent{background:var(--via);color:#1b1206}
+.btn.ghost{background:var(--surface-2);border-color:var(--line)}
+.btn.danger{background:transparent;color:var(--bad);border-color:var(--bad)}
+.btn.small{min-height:36px;padding:6px 12px;font-size:.85rem}
+.note{color:var(--muted);font-size:.82rem;margin:8px 0 0}
+.dirty{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:.85rem;font-weight:600;margin-top:10px}
+.store{display:grid;gap:6px;background:var(--surface-2);border-radius:8px;padding:10px 12px;font-size:.86rem}
+.store .row{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.store .k{font-weight:700;min-width:92px;color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em}
+.warnTxt{color:var(--warn);font-weight:700}
+.okTxt{color:var(--ok);font-weight:700}
+.levs{display:grid;gap:8px;margin-top:12px}
+.lev{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:10px 12px;flex-wrap:wrap}
+.lev.cur{border-color:var(--brand);background:var(--sel-bg)}
+.lev .info{flex:1 1 200px;min-width:0}
+.lev .t{font-weight:700;overflow-wrap:anywhere}
+.lev .s{font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.lev .acts{display:flex;gap:6px}
+.cad{background:var(--surface-2);border-radius:8px;padding:12px}
+.cad .levs{max-height:360px;overflow:auto;margin-top:10px}
+.cad button.lev{background:var(--surface);cursor:pointer;text-align:left;width:100%;font:inherit;color:inherit}
+.cad button.lev:hover{border-color:var(--brand)}
+.maps{font-size:.8rem;color:var(--muted);line-height:1.6;margin-top:8px;overflow-wrap:anywhere}
+.maps b{color:var(--fg);font-weight:600}
+.vazio{color:var(--muted);font-size:.86rem;padding:10px 2px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.82rem;margin:0 0 10px;align-items:center}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:5px;vertical-align:-1px;border:2px solid var(--surface)}
+.legend .sp{flex:1}
+.svgwrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);-webkit-overflow-scrolling:touch}
+.svgwrap.fit svg{width:100%;height:auto}
+svg#malha{display:block}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.area{border:1px solid var(--line);border-radius:8px;padding:12px;min-width:0}
+.area .hd{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px}
+.area .hd b{font-size:.95rem}
+.pill{font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;letter-spacing:.02em}
+.pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.na{background:var(--surface-2);color:var(--muted)}
+.kv{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;margin:0;font-size:.86rem;align-items:baseline}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font:600 .9rem var(--f-num);font-variant-numeric:tabular-nums;text-align:right}
+.kv .req{font:.78rem var(--f-num);color:var(--muted);text-align:right}
+.kv .f{color:var(--bad)} .kv .p{color:var(--ok)} .kv .i{color:var(--muted);font-weight:400;font-family:var(--f-ui);font-size:.8rem}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{background:var(--surface-2);font-size:.74rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);position:sticky;top:0}
+td.n{font-family:var(--f-num);font-variant-numeric:tabular-nums;text-align:right}
+td.no{font:700 .95rem var(--f-num)}
+tbody tr{cursor:pointer} tbody tr:hover{background:var(--surface-2)}
+.tag{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.toolbar select{width:auto;min-height:36px;padding:6px 10px}
+/* modal */
+.modal{position:fixed;inset:0;z-index:50;background:rgba(5,12,20,.6);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:100%;max-width:640px;max-height:94vh;overflow:auto;border-radius:14px 14px 0 0;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+@media (min-width:700px){.modal{align-items:center}.sheet{border-radius:14px}}
+.sheet-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.sheet-head h2{margin:0;font-size:1.3rem;display:flex;gap:10px;align-items:center}
+.badge-no{display:inline-flex;align-items:center;justify-content:center;min-width:40px;height:40px;padding:0 8px;border-radius:20px;color:#fff;font:700 1.1rem var(--f-num)}
+.eyebrow{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+.icon-btn{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;width:44px;height:44px;cursor:pointer;font-size:1.1rem}
+.foto-box{margin-top:12px;border-radius:8px;overflow:hidden;background:var(--surface-2);border:1px dashed var(--line)}
+.foto-box img,.foto-box video{display:block;width:100%;max-height:46vh;object-fit:contain;background:#000}
+.foto-vazia{padding:22px 14px;text-align:center;color:var(--muted);font-size:.86rem}
+.lux-in{font:700 1.6rem var(--f-num);text-align:center;min-height:58px;margin-top:4px}
+.err{color:var(--bad);font-size:.85rem;font-weight:600;margin-top:6px}
+.boot{background:var(--warn-bg);color:var(--warn);padding:10px 16px;font-size:.88rem;font-weight:600}
+.errbox{background:var(--bad-bg);color:var(--bad);border-radius:8px;padding:10px 12px;font-size:.88rem;font-weight:600;margin-top:10px}
+#boot.errbox{border-radius:0;margin:0}
+input.erro{border-color:var(--bad);box-shadow:0 0 0 2px var(--bad-bg)}
+.modal.ask{z-index:70;align-items:center}
+.ask .sheet{max-width:460px;border-radius:14px}
+.ask p{margin:0;font-size:.95rem;line-height:1.5}
+.cadsel{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.cadsel .full{grid-column:1/-1}
+details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
+#toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:80;background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;font-size:.9rem;max-width:calc(100% - 32px);box-shadow:0 6px 20px rgba(0,0,0,.25)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Malha de Medição · NBR 5101:2024</h1>
+  <p>Levantamento em campo · vias C0–C5 e M1–M6 · passeios P1–P6</p>
+</header>
+
+<div class="boot" id="boot">Carregando a ferramenta… Se esta mensagem não sumir, o aplicativo que abriu o arquivo não executa scripts. Abra o arquivo no Chrome (Android) ou no Safari (iPhone).</div>
+
+<div class="progress" aria-live="polite">
+  <span class="count" id="pgCount">0 / 0</span>
+  <div class="bar" aria-hidden="true"><i id="pgBar"></i></div>
+  <span class="saved" id="pgSaved"></span>
+  <button class="btn primary small" id="btnProx">Medir próximo pendente</button>
+</div>
+
+<main>
+<section class="card">
+  <h2><span class="step">00</span>Levantamentos neste aparelho</h2>
+  <div class="store" id="store"></div>
+  <div class="actions">
+    <button class="btn primary" id="btnArq">Salvar arquivo no aparelho</button>
+    <label class="btn ghost" for="inJson">Abrir arquivo salvo</label>
+    <input id="inJson" type="file" accept="application/json,.json" hidden>
+    <button class="btn ghost" id="btnNovo">Novo levantamento</button>
+  </div>
+  <div class="actions" id="bkWrap" style="margin-top:8px">
+    <label for="bkN" class="fld-lbl" style="margin:0">Cópia automática em arquivo</label>
+    <select id="bkN" style="width:auto;min-height:36px;padding:6px 10px">
+      <option value="0">Desligada</option>
+      <option value="5">A cada 5 medições</option>
+      <option value="10" selected>A cada 10 medições</option>
+      <option value="20">A cada 20 medições</option>
+    </select>
+  </div>
+  <div class="levs" id="levs"></div>
+</section>
+
+<section class="card" id="secCfg">
+  <h2><span class="step">01</span>Configuração do trecho</h2>
+
+  <div class="cad">
+    <div class="actions" style="margin-top:0">
+      <label class="btn primary small" for="inCad">Carregar banco de dados (CSV ou XLSX)</label>
+      <input id="inCad" type="file" accept=".csv,.txt,.xlsx,.xlsm,.xls,.ods" hidden>
+      <button class="btn ghost small" id="btnModelo">Baixar planilha modelo</button>
+    </div>
+    <div id="cadInfo" hidden style="margin-top:12px">
+      <div class="cadsel">
+        <div class="fld"><label for="cadCol">1 · Filtrar por</label><select id="cadCol"></select></div>
+        <div class="fld"><label for="cadVal">2 · Valor do filtro</label><select id="cadVal"></select></div>
+        <div class="fld full"><label for="cadBusca">Buscar endereço (opcional)</label><input id="cadBusca" type="search" placeholder="Digite parte do nome para encurtar a lista" autocomplete="off"></div>
+        <div class="fld full"><label for="cadEnd">3 · Endereço</label><select id="cadEnd"></select></div>
+      </div>
+      <details class="maps"><summary id="cadResumo">Banco de dados</summary><div id="cadMaps"></div></details>
+      <div class="actions" style="margin-top:8px"><button class="btn danger small" id="btnCadRem">Remover banco de dados</button></div>
+    </div>
+    <p class="note" id="cadNote">Carregue a planilha de vias, escolha o filtro e depois o endereço. Município, via, geometria, passeios e classes são preenchidos automaticamente e a malha é gerada.</p>
+  </div>
+
+  <h3>Identificação</h3>
+  <div class="grid">
+    <div class="fld"><label for="municipio">Município</label><input id="municipio" list="listaMun" value="Arujá/SP" autocomplete="off">
+      <datalist id="listaMun"><option value="Arujá/SP"><option value="Cambé/PR"><option value="São José do Rio Pardo/SP"><option value="Patos/PB"><option value="Cajazeiras/PB"></datalist></div>
+    <div class="fld"><label for="via">Via do trecho (endereço)</label><input id="via" placeholder="ex.: Rua Barão de Jaceguai — Trecho 01"></div>
+    <div class="fld"><label for="data">Data</label><input id="data" type="date"></div>
+    <div class="fld"><label for="resp">Responsável</label><input id="resp" placeholder="Nome do técnico"></div>
+    <div class="fld"><label for="luximetro">Instrumento (modelo / nº série)</label><input id="luximetro" placeholder="ex.: Minipa MLM-1011 · 12345"></div>
+  </div>
+
+  <h3>Geometria</h3>
+  <div class="grid">
+    <div class="fld"><label for="S">Distância entre luminárias S (m)</label><input id="S" type="text" inputmode="decimal" autocomplete="off" value="30"></div>
+    <div class="fld"><label for="L">Largura da faixa (m)</label><input id="L" type="text" inputmode="decimal" autocomplete="off" value="3"></div>
+    <div class="fld"><label for="faixas">Nº de faixas</label><input id="faixas" type="text" inputmode="numeric" autocomplete="off" value="2"></div>
+    <div class="fld"><label for="postes">Arranjo dos postes</label>
+      <select id="postes">
+        <option value="u1">Unilateral · lado 1</option>
+        <option value="u2">Unilateral · lado 2</option>
+        <option value="bf">Bilateral frente a frente</option>
+        <option value="ba">Bilateral alternado</option>
+      </select></div>
+  </div>
+
+  <h3>Passeios</h3>
+  <div class="grid">
+    <div class="fld span2">
+      <span class="fld-lbl" id="lblCalc">Existência de passeio</span>
+      <div class="seg" id="segCalc" role="radiogroup" aria-labelledby="lblCalc">
+        <input type="radio" name="calc" id="calcAmbos" value="ambos" checked><label for="calcAmbos">Ambos os lados</label>
+        <input type="radio" name="calc" id="calcL1" value="lado1"><label for="calcL1">Só lado 1</label>
+        <input type="radio" name="calc" id="calcL2" value="lado2"><label for="calcL2">Só lado 2</label>
+        <input type="radio" name="calc" id="calcNenhum" value="nenhum"><label for="calcNenhum">Nenhum</label>
+      </div>
+    </div>
+    <div class="fld" id="fldLc1"><label for="Lc1">Largura passeio lado 1 (m)</label><input id="Lc1" type="text" inputmode="decimal" autocomplete="off" value="2"></div>
+    <div class="fld" id="fldLc2"><label for="Lc2">Largura passeio lado 2 (m)</label><input id="Lc2" type="text" inputmode="decimal" autocomplete="off" value="2"></div>
+  </div>
+
+  <h3>Classe de iluminação</h3>
+  <div class="grid">
+    <div class="fld"><label for="classeC">Classe da via (C ou M)</label>
+      <select id="classeC">
+        <optgroup label="Classe C · iluminância (lx)"><option>C0</option><option>C1</option><option>C2</option><option>C3</option><option>C4</option><option selected>C5</option></optgroup>
+        <optgroup label="Classe M · luminância (cd/m²)"><option>M1</option><option>M2</option><option>M3</option><option>M4</option><option>M5</option><option>M6</option></optgroup>
+      </select></div>
+    <div class="fld"><label for="classeP">Classe do passeio (P)</label>
+      <select id="classeP"><option>P1</option><option>P2</option><option>P3</option><option>P4</option><option selected>P5</option><option>P6</option></select></div>
+  </div>
+
+  <div class="errbox" id="errbox" hidden role="alert"></div>
+  <div class="dirty" id="dirty" hidden>A geometria mudou. Toque em “Gerar malha” para aplicar (as medições deste levantamento serão apagadas).</div>
+  <div class="actions">
+    <button class="btn primary" id="btnGerar">Gerar malha</button>
+    <button class="btn ghost" id="btnLimpar">Limpar medições</button>
+  </div>
+  <p class="note">Passeio 1 é desenhado acima da via; passeio 2, abaixo. A numeração dos pontos começa no passeio 1, segue pelas faixas e termina no passeio 2. As distâncias transversais dos passeios são contadas a partir do meio-fio.</p>
+</section>
+
+<section class="card">
+  <h2><span class="step">02</span>Malha gráfica <span class="note" id="malhaInfo" style="margin:0"></span></h2>
+  <div class="legend">
+    <span><i style="background:var(--via)"></i><span id="lgVia">Via C5</span></span>
+    <span id="lgPedWrap"><i style="background:var(--ped)"></i><span id="lgPed">Passeio P5</span></span>
+    <span><i style="background:var(--ok)"></i>Medido (valor acima do ponto)</span>
+    <span class="sp"></span>
+    <button class="btn ghost small" id="btnFit">Ajustar à tela</button>
+  </div>
+  <div class="svgwrap" id="svgwrap"><svg id="malha" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Malha de medição"></svg></div>
+  <p class="note" id="malhaNote">Cada ponto mostra seu número. Toque no ponto para registrar a leitura e a foto; o mesmo número sai na foto, na tabela e nos arquivos.</p>
+</section>
+
+<section class="card">
+  <h2><span class="step">03</span>Resumo de conformidade</h2>
+  <div class="actions" style="margin:0 0 10px"><button class="btn ghost small" id="btnEst" type="button">Completar pendentes por estimativa</button><button class="btn ghost small" id="btnCaso" type="button">Gerar estudo de caso</button><span class="note" id="estInfo" style="margin:0"></span></div>
+  <div class="metodo" id="casoBanner" hidden style="border-color:var(--bad)"></div>
+  <div class="cards" id="resumo"></div>
+  <p class="note" id="resumoNote"></p>
+  <h3>Observações</h3>
+  <div class="fld"><label for="obs">Observações de campo (constam no PDF, no relatório e nos arquivos exportados)</label>
+    <textarea id="obs" rows="4" autocomplete="off" placeholder="Condições da medição, obstáculos, árvores, interferências, luminárias apagadas, alterações encontradas em campo, verificações complementares necessárias…"></textarea></div>
+</section>
+
+<section class="card">
+  <h2><span class="step">04</span>Registros</h2>
+  <div class="toolbar">
+    <select id="filtro" aria-label="Filtrar pontos">
+      <option value="todos">Todos os pontos</option>
+      <option value="pend">Pendentes</option>
+      <option value="med">Medidos</option>
+    </select>
+    <span class="note" id="filtroInfo" style="margin:0"></span>
+    <button class="btn ghost small" id="btnImp" type="button">Importar folha de campo</button>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Nº</th><th>Área</th><th>Grupo</th><th style="text-align:right">Long. (m)</th><th style="text-align:right">Transv. (m)</th><th style="text-align:right">Valor</th><th>Foto</th><th>Hora</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div class="actions">
+    <button class="btn primary" id="btnRel">Exportar relatório (HTML com fotos)</button>
+    <button class="btn accent" id="btnPdf">Exportar PDF</button>
+    <button class="btn ghost" id="btnCsv">Exportar CSV</button>
+  </div>
+  <p class="note">O CSV abre direto no Excel (separador “;” e vírgula decimal). Para guardar ou continuar o trabalho em outro aparelho, use “Salvar arquivo no aparelho”.</p>
+</section>
+</main>
+
+<div class="modal imp" id="imp" hidden role="dialog" aria-modal="true" aria-labelledby="impTitle">
+  <div class="sheet" style="max-width:1100px">
+    <div class="sheet-head"><h2 id="impTitle">Importar folha de campo</h2><button class="btn ghost small" id="impFechar" type="button">Fechar</button></div>
+    <p class="note">Cole as leituras da folha, uma linha por linha da tabela (L1, L2, …) com os valores dos postes P1, P2, … separados por espaço. Use <b>?</b> depois do valor quando a letra estiver duvidosa e <b>-</b> para célula vazia. Também vale a lista <b>12 = 34,5</b> (número do ponto = leitura). Nada é gravado antes da conferência.</p>
+    <div class="imp-cols">
+      <div>
+        <textarea id="impTxt" rows="9" spellcheck="false" placeholder="L1 52,7 46,8 28,4 20,4 19,1 15,8 17,7 15,0 25,4 32,7 49,6&#10;L2 66,4 54,6 14,8? 24,8 18,5? ..."></textarea>
+        <div class="actions"><label class="btn ghost small" for="impFoto">Anexar foto da folha (para conferir)</label><input type="file" id="impFoto" accept="image/*" hidden><button class="btn primary small" id="impConferir" type="button">Conferir</button></div>
+        <details id="impChatBox" style="margin-top:10px" open><summary><b>Sem chave de API:</b> ler com ChatGPT, Claude ou Gemini</summary>
+          <ol class="note" style="margin:6px 0 6px 18px;padding:0">
+            <li>Clique em <b>Copiar instruções</b> e abra o chat de sua preferência.</li>
+            <li>Anexe a foto da folha, cole as instruções e envie.</li>
+            <li>Copie a resposta, cole na caixa de leituras acima e clique em <b>Conferir</b>.</li>
+          </ol>
+          <textarea id="impPrompt" readonly rows="3" style="width:100%;font-size:.75rem;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--fg)"></textarea>
+          <div class="actions" style="margin-top:4px"><button class="btn primary small" id="impCopiar" type="button">Copiar instruções</button>
+            <a class="btn ghost small" href="https://chatgpt.com/" target="_blank" rel="noopener">ChatGPT</a>
+            <a class="btn ghost small" href="https://claude.ai/new" target="_blank" rel="noopener">Claude</a>
+            <a class="btn ghost small" href="https://gemini.google.com/app" target="_blank" rel="noopener">Gemini</a>
+            <span class="note" id="impCopiarSt" style="margin:0"></span></div>
+          <p class="note">A leitura de letra de mão pode errar em qualquer IA: a conferência antes de gravar continua obrigatória.</p>
+        </details>
+        <details id="impIAbox" style="margin-top:10px"><summary><b>Leitura automática da foto</b> (internet + chave de API da Anthropic)</summary>
+          <p class="note">Ao clicar em “Ler foto automaticamente”, a foto anexada é enviada à API da Anthropic, que transcreve a tabela de leituras. O texto volta para a caixa acima e segue para a conferência: nada é gravado sem você revisar. A chave fica só neste aparelho (e só se você marcar “lembrar”) e nunca entra em arquivo exportado. Use uma chave com limite de gasto.</p>
+          <input type="password" id="impKey" placeholder="Chave de API (sk-ant-…)" autocomplete="off" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)">
+          <input type="text" id="impModelo" value="claude-sonnet-5-5" aria-label="Modelo" style="width:100%;margin-top:6px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)">
+          <label class="note" style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="impLembrar"> Lembrar a chave neste aparelho</label>
+          <div class="actions" style="margin-top:4px"><button class="btn accent small" id="impLer" type="button">Ler foto automaticamente</button><span class="note" id="impIAst" style="margin:0"></span></div>
+        </details>
+      </div>
+      <div id="impImgBox" hidden>
+        <div class="actions" style="margin-top:0"><button class="btn ghost small" id="impGirar" type="button">Girar 90°</button><button class="btn ghost small" id="impMais" type="button">+</button><button class="btn ghost small" id="impMenos" type="button">−</button></div>
+        <div id="impImgWrap"><img id="impImg" alt="Foto da folha de campo"></div>
+      </div>
+    </div>
+    <div id="impMap"></div>
+    <div id="impConf"></div>
+    <label class="note" style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" id="impSubst"> Substituir leituras já existentes que divergirem</label>
+    <div class="actions"><button class="btn primary" id="impAplicar" type="button" disabled>Gravar leituras</button><span class="note" id="impResumo" style="margin:0"></span></div>
+  </div>
+</div>
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="sheet">
+    <div class="sheet-head">
+      <div><div class="eyebrow" id="mArea"></div><h2 id="mTitle"><span class="badge-no" id="mNo">1</span><span id="mNome">Ponto 1</span></h2></div>
+      <button class="icon-btn" id="mClose" aria-label="Fechar">✕</button>
+    </div>
+    <dl class="kv" id="mInfo" style="grid-template-columns:auto 1fr;margin-top:10px"></dl>
+
+    <div class="foto-box">
+      <img id="preview" hidden alt="Foto do display do instrumento">
+      <video id="video" hidden autoplay playsinline muted></video>
+      <div class="foto-vazia" id="fotoVazia">Sem foto. Fotografe o display do instrumento posicionado no ponto.</div>
+    </div>
+    <div class="actions">
+      <label class="btn primary" for="inCam">Tirar foto</label>
+      <input id="inCam" type="file" accept="image/*" capture="environment" hidden>
+      <label class="btn ghost" for="inGal">Galeria</label>
+      <input id="inGal" type="file" accept="image/*" hidden>
+      <button class="btn ghost" id="btnLive" hidden>Câmera ao vivo</button>
+      <button class="btn accent" id="btnSnap" hidden>Capturar</button>
+      <button class="btn danger small" id="btnTiraFoto" hidden>Remover foto</button>
+    </div>
+    <p class="note" id="camNote"></p>
+    <section id="luxAutoBox" class="la-box" aria-labelledby="laTitulo">
+      <h3 id="laTitulo">Leitura automática do luxímetro</h3>
+      <p class="note">Transcrição assistida: a câmera lê o visor, mas o valor só vai para o ponto depois que você conferir e salvar. A “estabilidade” indicada é a do reconhecimento da imagem, não do instrumento.</p>
+      <div class="actions">
+        <button class="btn primary big" id="laIniciar" type="button">Iniciar leitura automática</button>
+        <button class="btn danger big" id="laParar" type="button" hidden>Interromper leitura</button>
+        <label class="btn ghost big" for="laFoto">Ler valor de uma foto</label><input id="laFoto" type="file" accept="image/*" capture="environment" hidden>
+      </div>
+      <div class="la-mult"><label for="laMult">Multiplicador do visor</label><select id="laMult"><option value="1">×1 (sem multiplicador)</option><option value="10">×10 (visor mostra X10)</option><option value="100">×100 (visor mostra X100)</option></select><span class="note" style="margin:0">Se o visor mostrar “X10”, o valor gravado é o lido × 10 (ex.: 108,2 → 1.082 lx).</span></div>
+      <p class="note" id="laAviso" hidden></p>
+      <div id="laCamBox" hidden>
+        <div class="la-stage"><video id="laVideo" autoplay playsinline muted></video><img id="laImg" alt="Foto do visor" hidden><canvas id="laOver"></canvas><span class="la-rec" id="laRec" aria-hidden="true">● câmera ativa</span></div>
+        <p class="note">Arraste sobre a imagem (câmera ou foto) para marcar o visor: só a linha principal do lux, com uma pequena folga em volta dos números.</p>
+        <div class="la-read">
+          <div id="laValor" class="la-val" aria-live="polite">— lx</div>
+          <div id="laEstado" class="note" aria-live="polite">Aguardando…</div>
+          <div class="la-bar"><i id="laBarra"></i></div>
+          <div class="note" id="laEst">Leituras consistentes: 0/3</div>
+        </div>
+        <div class="actions"><button class="btn accent big" id="laConfirmar" type="button" disabled>Confirmar leitura e salvar foto</button></div>
+        <details class="la-aj"><summary>Ajustes do reconhecimento</summary>
+          <div class="la-grid">
+            <label>Inclinação dos dígitos<select id="laShear"><option value="auto">Automática</option><option value="0">0°</option><option value="5">5°</option><option value="8">8°</option><option value="10">10°</option><option value="12">12°</option><option value="-5">-5°</option><option value="-8">-8°</option></select></label>
+            <label>Cor dos dígitos<select id="laPol"><option value="auto">Automática</option><option value="dark">Escuros no claro</option><option value="light">Claros no escuro</option></select></label>
+            <label>Tolerância (lx)<input id="laTol" type="number" min="0" step="0.1" value="0" inputmode="decimal"></label>
+            <label>Leituras consistentes<input id="laCons" type="number" min="3" max="10" step="1" value="3" inputmode="numeric"></label>
+          </div>
+          <canvas id="laPrev" width="320" height="80"></canvas>
+          <div class="actions"><button class="btn ghost" id="laRedef" type="button">Redefinir região</button></div>
+        </details>
+      </div>
+    </section>
+
+    <div style="margin-top:14px">
+      <label for="lux" class="fld-lbl" id="luxLbl">Iluminância lida no luxímetro (lx)</label>
+      <input id="lux" class="lux-in" inputmode="decimal" autocomplete="off" placeholder="0,0 lx">
+      <div class="err" id="luxErr" hidden></div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="btnSalvarProx">Salvar e ir ao próximo</button>
+      <button class="btn ghost" id="btnSalvar">Salvar</button>
+      <button class="btn danger" id="btnApagar" hidden>Apagar medição</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal ask" id="ask" hidden role="alertdialog" aria-modal="true" aria-labelledby="askMsg">
+  <div class="sheet"><p id="askMsg"></p><div class="actions" id="askActs"></div></div>
+</div>
+
+<div id="toast" hidden role="status"></div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+$('boot').hidden = true;   // scripts estão rodando
+function mostrarFalha(m){
+  const b = $('boot'); b.hidden = false; b.className = 'errbox';
+  b.textContent = 'Erro na ferramenta: ' + m + '. Envie um print desta mensagem para o suporte.';
+}
+window.addEventListener('error', e => mostrarFalha(e.message || 'erro desconhecido'));
+window.addEventListener('unhandledrejection', e => mostrarFalha((e.reason && e.reason.message) || String(e.reason)));
+
+/* Confirmação dentro da página (janelas do navegador são bloqueadas em alguns visualizadores) */
+function pedir(msg, botoes){
+  return new Promise(res => {
+    $('askMsg').textContent = msg;
+    const a = $('askActs'); a.innerHTML = '';
+    botoes.forEach(b => {
+      const el = document.createElement('button');
+      el.className = 'btn ' + (b.cls || 'ghost'); el.textContent = b.t;
+      el.onclick = () => { $('ask').hidden = true; res(b.v); };
+      a.appendChild(el);
+    });
+    $('ask').hidden = false; a.firstChild.focus();
+  });
+}
+const confirmar = (msg, ok = 'Confirmar', cls = 'primary') => pedir(msg, [{t:ok, v:true, cls}, {t:'Cancelar', v:false}]);
+
+const KEY_V2 = 'malhaNBR5101.v2';
+const LS_ATUAL = 'malhaNBR5101.atual';
+const LS_BK = 'malhaNBR5101.bkN';
+
+/* Requisitos NBR 5101:2024 (Tabelas 2, 4 e 7) */
+const REQ_M = {
+  M1:{lmed:2.00,u0:.40,ul:.65,ti:14,eir:.45}, M2:{lmed:1.50,u0:.40,ul:.65,ti:14,eir:.45}, M3:{lmed:1.00,u0:.40,ul:.60,ti:15,eir:.45},
+  M4:{lmed:.75,u0:.40,ul:.60,ti:16,eir:.45},  M5:{lmed:.50,u0:.35,ul:.35,ti:16,eir:.45},  M6:{lmed:.30,u0:.35,ul:.35,ti:16,eir:.45}
+};
+const REQ_C = {
+  C0:{emed:50,u:.38,ti:14}, C1:{emed:30,u:.38,ti:14}, C2:{emed:20,u:.28,ti:14},
+  C3:{emed:15,u:.18,ti:15}, C4:{emed:10,u:.18,ti:16}, C5:{emed:7.5,u:.18,ti:16}
+};
+const REQ_P = {
+  P1:{emed:20,emin:4,ev:6}, P2:{emed:15,emin:3,ev:5}, P3:{emed:10,emin:2,ev:3},
+  P4:{emed:7.5,emin:1.5,ev:2.5}, P5:{emed:5,emin:1,ev:1.5}, P6:{emed:3,emin:.6,ev:1}
+};
+
+/* Regras da malha (NBR 5101:2024, 5.1) */
+const calcN = S => S <= 30 ? 10 : Math.ceil(S / 3 - 1e-9);
+const nTransP = Lc => Lc <= 4.5 ? 3 : Math.ceil(Lc / 1.5 - 1e-9);
+
+let state = { id:null, cfg:null, pontos:[] };
+let sel = null, stream = null, fotoTemp, fitMode = false;
+let idbOk = true, persistente = null, bkN = 10;
+let fileHandle = null, arqPendente = false, tArq = null, cadastro = null;
+const podeFS = 'showSaveFilePicker' in window;
+
+const fmt = (n, d=2) => Number(n).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => parseFloat(String(v).replace(',', '.'));
+const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const ladosDe = calc => ({ambos:[1,2], lado1:[1], lado2:[2], nenhum:[]})[calc] || [];
+const slug = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w]+/g,'_').replace(/^_|_$/g,'').slice(0,40) || 'trecho';
+const nro = p => parseInt(p.id.slice(1), 10);
+const hhmm = iso => iso ? new Date(iso).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '—';
+const dataHora = iso => iso ? new Date(iso).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+const nMed = () => state.pontos.filter(p => p.lux != null).length;
+const novoId = () => 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const isM = () => !!state.cfg && /^M/.test(state.cfg.classeC);
+const unid = p => p.kind === 'via' && isM() ? 'cd/m²' : 'lx';
+const fmtVal = p => fmt(p.lux, unid(p) === 'cd/m²' ? 2 : 1);
+const LADO_TXT = {ambos:'ambos os lados', lado1:'só lado 1', lado2:'só lado 2', nenhum:'nenhum'};
+
+function toast(msg, ms){
+  const t = $('toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(()=> t.hidden = true, ms || 2800);
+}
+
+/* ---------- Formulário ---------- */
+function lerCfg(){
+  return {
+    municipio:$('municipio').value.trim(), via:$('via').value.trim(), data:$('data').value,
+    resp:$('resp').value.trim(), luximetro:$('luximetro').value.trim(),
+    S:num($('S').value), L:num($('L').value), faixas:Math.round(num($('faixas').value)),
+    calc:document.querySelector('input[name=calc]:checked').value,
+    Lc1:num($('Lc1').value), Lc2:num($('Lc2').value),
+    postes:$('postes').value, classeC:$('classeC').value, classeP:$('classeP').value,
+    obs:$('obs').value
+  };
+}
+function escreverCfg(c){
+  ['municipio','via','data','resp','luximetro','S','L','faixas','Lc1','Lc2','postes','classeC','classeP']
+    .forEach(k => { if (c[k] !== undefined && c[k] !== null && !Number.isNaN(c[k]) && $(k)) $(k).value = typeof c[k] === 'number' ? String(c[k]).replace('.', ',') : c[k]; });
+  $('obs').value = c.obs || '';
+  const r = document.querySelector(`input[name=calc][value="${c.calc}"]`); if (r) r.checked = true;
+  syncCalcUI(); $('dirty').hidden = true;
+}
+function validar(c){
+  if (!(c.S > 0)) return {campo:'S', msg:'Informe a distância entre luminárias S.'};
+  if (!(c.L > 0)) return {campo:'L', msg:'Informe a largura da faixa.'};
+  if (!(c.faixas >= 1 && c.faixas <= 8)) return {campo:'faixas', msg:'O nº de faixas deve ficar entre 1 e 8.'};
+  for (const l of ladosDe(c.calc)) if (!(c['Lc'+l] > 0)) return {campo:'Lc'+l, msg:`Informe a largura do passeio do lado ${l}.`};
+  return null;
+}
+function mostrarErro(err, rolar){
+  document.querySelectorAll('input.erro').forEach(e => e.classList.remove('erro'));
+  $('errbox').hidden = !err;
+  if (!err) return;
+  $('errbox').textContent = err.msg + ' A malha ainda não foi gerada.';
+  $(err.campo).classList.add('erro');
+  if (rolar) { $(err.campo).scrollIntoView({behavior:'smooth', block:'center'}); setTimeout(() => $(err.campo).focus({preventScroll:true}), 350); }
+}
+function syncCalcUI(){
+  const ls = ladosDe(document.querySelector('input[name=calc]:checked').value);
+  $('fldLc1').hidden = !ls.includes(1);
+  $('fldLc2').hidden = !ls.includes(2);
+  $('classeP').disabled = ls.length === 0;
+}
+let tAuto = null;
+function checarDirty(){
+  if (!state.cfg) { $('dirty').hidden = true; return; }
+  const c = lerCfg(), o = state.cfg, ls = ladosDe(c.calc);
+  const dif = ['S','L','faixas','calc'].some(k => c[k] !== o[k]) || ls.some(l => c['Lc'+l] !== o['Lc'+l]);
+  clearTimeout(tAuto);
+  if (!dif) { $('dirty').hidden = true; mostrarErro(null); return; }
+  const err = validar(c);
+  if (err) { $('dirty').hidden = true; mostrarErro(err, false); return; }
+  mostrarErro(null);
+  if (!nMed()) { $('dirty').hidden = true; tAuto = setTimeout(() => gerar(false, true), 600); return; }  // sem medições: refaz sozinho
+  $('dirty').hidden = false;
+}
+function marcarAuto(campos){
+  document.querySelectorAll('.auto').forEach(e => e.classList.remove('auto'));
+  for (const k of campos) { const el = k === 'calc' ? $('segCalc') : $(k); if (el) el.classList.add('auto'); }
+  clearTimeout(marcarAuto._t); marcarAuto._t = setTimeout(() => document.querySelectorAll('.auto').forEach(e => e.classList.remove('auto')), 6000);
+}
+
+/* ---------- Geração (numeração: passeio 1 → faixas → passeio 2) ---------- */
+async function gerar(novo, silencioso){
+  clearTimeout(tAuto);
+  if (novo) $('obs').value = '';   // levantamento novo começa sem observações
+  const cfg = lerCfg(), err = validar(cfg);
+  mostrarErro(err, !silencioso);
+  if (err) return false;
+  const med = novo ? 0 : nMed();
+  if (med && !(await confirmar(`Gerar a nova malha apaga ${med} medição(ões) deste levantamento.`, 'Gerar e apagar medições', 'danger'))) return false;
+  const N = calcN(cfg.S), D = cfg.S / N, pts = [], ls = ladosDe(cfg.calc);
+  let n = 1; const nid = () => 'P' + String(n++).padStart(3,'0');
+  const passeio = l => {
+    const Lc = cfg['Lc'+l], k = nTransP(Lc), st = Lc / k;
+    for (let i=0; i<N; i++) for (let j=0; j<k; j++)
+      pts.push({id:nid(), kind:'p', g:l, long:D/2+i*D, trans:(j+.5)*st, lux:null, foto:null, hora:null});
+  };
+  if (ls.includes(1)) passeio(1);
+  const vt = [cfg.L/6, cfg.L/2, 5*cfg.L/6];
+  for (let f=1; f<=cfg.faixas; f++) for (let i=0; i<N; i++) for (const t of vt)
+    pts.push({id:nid(), kind:'via', g:f, long:D/2+i*D, trans:t, lux:null, foto:null, hora:null});
+  if (ls.includes(2)) passeio(2);
+  const agora = new Date().toISOString();
+  if (novo || !state.id) {
+    state = { id:novoId(), criado:agora, cfg, pontos:pts, salvoArquivo:null };
+    fileHandle = null; arqPendente = false;
+  } else {
+    await fotosApagarLev(state.id);
+    state = { ...state, cfg, pontos:pts, estOn:false, exemplo:false };
+  }
+  sel = null;
+  await salvar();
+  renderTudo(); renderLevs(); $('dirty').hidden = true;
+  if (!silencioso) toast(`Malha gerada: ${pts.length} pontos.`);
+  return true;
+}
+
+/* ---------- Nomes ---------- */
+const grupoNome = p => p.kind === 'via' ? `Faixa ${p.g}` : `Passeio ${p.g}`;
+const areaNome = p => p.kind === 'via' ? `Via ${state.cfg.classeC}` : `Passeio ${state.cfg.classeP}`;
+
+/* ---------- Desenho ---------- */
+const SVG_CSS = `
+.b-walk{fill:url(#lajota)} .walk{fill:var(--walk)} .walkjoint{stroke:var(--walkjoint);stroke-width:1;fill:none}
+.b-verge{fill:var(--verge)} .b-road{fill:var(--asphalt)}
+.lane{stroke:var(--mark);stroke-width:2;stroke-dasharray:14 12;fill:none}
+.curb{stroke:var(--curb);stroke-width:4}
+.area-l{fill:none;stroke:var(--brand);stroke-width:1.5;stroke-dasharray:6 5;opacity:.7}
+.dim{stroke:var(--muted);stroke-width:1.2;fill:none} .dimt{fill:var(--fg);font:600 12px system-ui,sans-serif}
+.lbl{fill:var(--muted);font:600 11px system-ui,sans-serif} .lbl2{fill:var(--fg);font:700 11px ui-monospace,Menlo,monospace}
+.post{fill:#46545f;stroke:var(--surface);stroke-width:1.5} .arm{stroke:#46545f;stroke-width:3}
+.lum{fill:#ffe082;stroke:#6b5a1d;stroke-width:1.5} .glow{fill:url(#glow)}
+.pt{cursor:pointer} .pt .hit{fill:transparent}
+.pt .dot{stroke:#fff;stroke-width:2.5} .pt.via .dot{fill:var(--via)} .pt.p .dot{fill:var(--ped)} .pt.ok .dot{fill:var(--ok)}
+.pt.sel .dot{stroke:var(--fg);stroke-width:3.5}
+.pt:hover .dot{stroke-width:4}
+.num{fill:#fff;font:800 11px system-ui,sans-serif;text-anchor:middle;dominant-baseline:central;paint-order:stroke;stroke:rgba(0,0,0,.45);stroke-width:2px;pointer-events:none}
+.num.n3{font-size:9px}
+.luxl{fill:#fff;font:700 10px ui-monospace,Menlo,monospace;paint-order:stroke;stroke:#000;stroke-width:3px;text-anchor:middle;pointer-events:none}
+.cam{fill:#fff;stroke:#0d1b27;stroke-width:1.5}
+`;
+document.head.insertAdjacentHTML('beforeend', `<style>${SVG_CSS}</style>`);
+
+function svgMalha(){
+  const {cfg, pontos} = state, em = estimarPendentes();
+  const L = cfg.L, F = cfg.faixas, S = cfg.S, N = calcN(S), D = S / N;
+  const ls = ladosDe(cfg.calc), has1 = ls.includes(1), has2 = ls.includes(2);
+  const w1 = has1 ? cfg.Lc1 : .5, w2 = has2 ? cfg.Lc2 : .5;
+  let minSp = L / 3;
+  if (has1) minSp = Math.min(minSp, cfg.Lc1 / nTransP(cfg.Lc1));
+  if (has2) minSp = Math.min(minSp, cfg.Lc2 / nTransP(cfg.Lc2));
+  const sx = Math.max(40 / D, 820 / S);
+  const sy = Math.min(100, Math.max(34, 40 / minSp));
+  const mL = 92, mR = 26, mT = 58, mB = 22;
+  const W = Math.round(mL + S*sx + mR), H = Math.round(mT + (w1 + F*L + w2)*sy + mB);
+  const X = m => mL + m*sx;
+  const yR0 = mT + w1*sy, yR1 = yR0 + F*L*sy, yEnd = yR1 + w2*sy;
+  const bx = mL - 8, bw = S*sx + 16;
+  let s = `<defs>
+    <radialGradient id="glow"><stop offset="0" stop-color="#ffd54f" stop-opacity=".5"/><stop offset="1" stop-color="#ffd54f" stop-opacity="0"/></radialGradient>
+    <pattern id="lajota" width="${(.5*sx).toFixed(1)}" height="${(.5*sy).toFixed(1)}" patternUnits="userSpaceOnUse">
+      <rect class="walk" width="${(.5*sx).toFixed(1)}" height="${(.5*sy).toFixed(1)}"/>
+      <path class="walkjoint" d="M0 0H${(.5*sx).toFixed(1)}M0 0V${(.5*sy).toFixed(1)}"/></pattern>
+    <clipPath id="clipVia"><rect x="${bx}" y="${mT}" width="${bw}" height="${yEnd-mT}"/></clipPath></defs>`;
+  s += `<rect class="${has1?'b-walk':'b-verge'}" x="${bx}" y="${mT}" width="${bw}" height="${w1*sy}"/>`;
+  s += `<rect class="b-road" x="${bx}" y="${yR0}" width="${bw}" height="${F*L*sy}"/>`;
+  s += `<rect class="${has2?'b-walk':'b-verge'}" x="${bx}" y="${yR1}" width="${bw}" height="${w2*sy}"/>`;
+  for (let f=1; f<F; f++) { const y = yR0 + f*L*sy; s += `<line class="lane" x1="${bx}" x2="${bx+bw}" y1="${y}" y2="${y}"/>`; }
+  s += `<line class="curb" x1="${bx}" x2="${bx+bw}" y1="${yR0}" y2="${yR0}"/><line class="curb" x1="${bx}" x2="${bx+bw}" y1="${yR1}" y2="${yR1}"/>`;
+  s += `<rect class="area-l" x="${X(0)}" y="${mT}" width="${S*sx}" height="${yEnd-mT}"/>`;
+  const yd = mT - 16;
+  s += `<path class="dim" d="M${X(0)} ${yd}H${X(S)}M${X(0)} ${yd-6}V${yd+6}M${X(S)} ${yd-6}V${yd+6}"/>`;
+  s += `<text class="dimt" x="${(X(0)+X(S))/2}" y="${yd-8}" text-anchor="middle">S = ${fmt(S)} m · N = ${N} · D = ${fmt(D)} m</text>`;
+  const rot = (y0, h, a, b) => {
+    const cy = y0 + h/2;
+    return h >= 28 && b
+      ? `<text class="lbl" x="${mL-14}" y="${cy-3}" text-anchor="end">${a}</text><text class="lbl2" x="${mL-14}" y="${cy+11}" text-anchor="end">${b}</text>`
+      : `<text class="lbl" x="${mL-14}" y="${cy+4}" text-anchor="end">${a}</text>`;
+  };
+  s += has1 ? rot(mT, w1*sy, 'Passeio 1', fmt(cfg.Lc1)+' m') : rot(mT, w1*sy, 'Sem passeio 1', '');
+  for (let f=1; f<=F; f++) s += rot(yR0+(f-1)*L*sy, L*sy, 'Faixa '+f, fmt(L)+' m');
+  s += has2 ? rot(yR1, w2*sy, 'Passeio 2', fmt(cfg.Lc2)+' m') : rot(yR1, w2*sy, 'Sem passeio 2', '');
+  const arr = {u1:[[0,1],[S,1]], u2:[[0,2],[S,2]], bf:[[0,1],[S,1],[0,2],[S,2]], ba:[[0,1],[S,2]]}[cfg.postes] || [];
+  const armLen = Math.min(1.5, F*L/2) * sy, glowR = Math.min(F*L, 5) * sy;
+  let glows = '', posts = '';
+  arr.forEach(([x, lado]) => {
+    const px = X(x), py = lado === 1 ? yR0 - Math.min(.4, w1/2)*sy : yR1 + Math.min(.4, w2/2)*sy;
+    const ly = lado === 1 ? yR0 + armLen : yR1 - armLen;
+    glows += `<circle class="glow" cx="${px}" cy="${ly}" r="${glowR}"/>`;
+    posts += `<line class="arm" x1="${px}" y1="${py}" x2="${px}" y2="${ly}"/><circle class="post" cx="${px}" cy="${py}" r="6"/><circle class="lum" cx="${px}" cy="${ly}" r="7"/>`;
+  });
+  s += `<g clip-path="url(#clipVia)">${glows}</g>` + posts;
+  pontos.forEach((p, i) => {
+    const cx = X(p.long).toFixed(1);
+    const cy = (p.kind === 'via' ? yR0 + ((p.g-1)*L + p.trans)*sy : (p.g === 1 ? yR0 - p.trans*sy : yR1 + p.trans*sy)).toFixed(1);
+    const med = p.lux != null, k = nro(p), est = !med && em.has(p.id) ? fmtEst(p, em.get(p.id)) : null;
+    s += `<g class="pt ${p.kind}${med?' ok':''}${i===sel?' sel':''}" data-i="${i}" tabindex="0" role="button" aria-label="Ponto ${k}, ${esc(grupoNome(p))}, ${med?fmtVal(p)+' '+unid(p):est?est+' '+unid(p):'pendente'}">
+      <title>Ponto ${k} · ${esc(grupoNome(p))}${med?' · '+fmtVal(p)+' '+unid(p):est?' · '+est+' '+unid(p):''}</title>
+      <circle class="hit" cx="${cx}" cy="${cy}" r="18"/><circle class="dot" cx="${cx}" cy="${cy}" r="11.5"/>
+      <text class="num${k>=100?' n3':''}" x="${cx}" y="${cy}">${k}</text>
+      ${p.foto?`<circle class="cam" cx="${+cx+10}" cy="${+cy-10}" r="3.5"/>`:''}
+      ${med?`<text class="luxl" x="${cx}" y="${+cy-16}">${fmtVal(p)} ${unid(p)}</text>`:est?`<text class="luxl" x="${cx}" y="${+cy-16}">${est} ${unid(p)}</text>`:''}</g>`;
+  });
+  return {W, H, s};
+}
+
+let _rmq = 0;
+function renderMalha(){ if (_rmq) return; _rmq = requestAnimationFrame(() => { _rmq = 0; renderMalhaAgora(); }); }
+function renderMalhaAgora(){
+  const svg = $('malha');
+  if (!state.cfg) { svg.innerHTML=''; return; }
+  const {W, H, s} = svgMalha();
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width', W); svg.setAttribute('height', H);
+  svg.innerHTML = s;
+  const c = state.cfg, ls = ladosDe(c.calc);
+  $('lgVia').textContent = `Via ${c.classeC}${isM() ? ' · luminância (cd/m²)' : ''}`;
+  $('lgPed').textContent = `Passeio ${c.classeP}`;
+  $('lgPedWrap').hidden = !ls.length;
+  const nv = state.pontos.filter(p=>p.kind==='via').length, np = state.pontos.length - nv;
+  $('malhaInfo').textContent = `${state.pontos.length} pontos · ${nv} na via${ls.length?` · ${np} em passeio`:' · sem passeio'}`;
+  $('malhaNote').textContent = isM()
+    ? 'Classe M: os pontos da via recebem luminância (cd/m²), lida com o observador no centro da faixa, a 1,5 m de altura e 60 m antes da área de medição, no sentido do fluxo. Toque no ponto para registrar a leitura e a foto.'
+    : 'Cada ponto mostra seu número. Toque no ponto para registrar a leitura e a foto; o mesmo número sai na foto, na tabela e nos arquivos.';
+}
+
+
+/* ---------- Autocompletar por estimativa ----------
+   As estimativas são DERIVADAS dos pontos medidos (nunca gravadas em p.lux): por isso não alteram os ícones da malha,
+   o progresso, a situação de conformidade (que só considera pontos medidos) nem a numeração; se um ponto pendente for
+   medido depois, a leitura real passa a valer sozinha. Só o sinalizador state.estOn é gravado.
+   Método: média ponderada pelo inverso da distância (m) dos vizinhos medidos na mesma área/faixa — ortogonais
+   (frente, trás, lados); se não houver, diagonais; se ainda não houver, até 2 passos. */
+const EST_CSS = `
+.estb{margin-top:8px;padding-top:6px;border-top:1px dashed var(--line)}
+.estt{font-size:.74rem;color:var(--warn);font-weight:700;margin-bottom:4px}
+.kv .e{color:var(--muted);font-style:italic;font-weight:600}
+td.est{color:var(--warn);font-style:italic}
+.metodo{border:1px solid var(--line);background:var(--surface-2);padding:10px 14px;margin:14px 0;border-radius:6px;font-size:13px}`;
+document.head.insertAdjacentHTML('beforeend', `<style>${EST_CSS}</style>`);
+
+/* ---------- Estudo de caso (preenchimento automático como "medido") ----------
+   Para exemplos/escopos: os pontos pendentes são preenchidos (interpolação) e aparecem como preenchidos na malha, na tabela e nos
+   arquivos, sem marca individual. Em troca, o documento fica SEMPRE identificado como estudo de caso (nome da via, observações,
+   aviso no topo, nome do arquivo e coluna Origem do CSV) enquanto existir ponto preenchido automaticamente (p.auto). Se o ponto
+   for medido de verdade (ou apagado), a marca p.auto some; sem pontos automáticos, o documento deixa de ser marcado. */
+const ESTUDO_TXT = 'ESTUDO DE CASO — documento de exemplo com valores ilustrativos; não constitui levantamento de campo nem laudo.';
+const casoOn = () => !!state.exemplo && state.pontos.some(p => p.auto);
+const impN = () => state.pontos.filter(p => p.imp).length;
+const ocrN = () => state.pontos.filter(p => p.ocr).length;
+const cfgExp = () => {
+  const imp = impN() ? `${impN()} leitura(s) transcrita(s) de folha de campo manuscrita e conferida(s) pelo operador.` : '';
+  if (!casoOn() && !imp) return state.cfg;
+  const obs = [casoOn() ? ESTUDO_TXT : '', state.cfg.obs || '', imp].filter(Boolean).join('\n');
+  return {...state.cfg, ...(casoOn() ? {via: (state.cfg.via || 'Sem nome') + ' (estudo de caso)'} : {}), obs};
+};
+const metodoTxt = (med, tot, n) => `Malha de ${tot} pontos levantada em pontos alternados (${med} medidos in loco), conforme orientação da coordenação; os demais ${n} pontos foram obtidos por interpolação dos pontos medidos vizinhos (média ponderada pelo inverso da distância).`;
+function estimarPendentes(forcar){
+  const m = new Map();
+  if ((!state.estOn && !forcar) || !state.pontos.length) return m;
+  const grupos = new Map(), r6 = x => Math.round(x * 1e6);
+  for (const p of state.pontos) { const k = p.kind + p.g; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(p); }
+  for (const arr of grupos.values()) {
+    const lo = [...new Set(arr.map(p => r6(p.long)))].sort((a,b) => a-b);
+    const tr = [...new Set(arr.map(p => r6(p.trans)))].sort((a,b) => a-b);
+    const cel = new Map(arr.map(p => [lo.indexOf(r6(p.long)) + ',' + tr.indexOf(r6(p.trans)), p]));
+    for (const p of arr) {
+      if (p.lux != null) continue;
+      const i = lo.indexOf(r6(p.long)), j = tr.indexOf(r6(p.trans));
+      const viz = (raio, diag) => {
+        const o = [];
+        for (let di = -raio; di <= raio; di++) for (let dj = -raio; dj <= raio; dj++) {
+          if (!di && !dj) continue;
+          if (!diag && di && dj) continue;
+          const q = cel.get((i+di) + ',' + (j+dj));
+          if (q && q.lux != null) o.push([q.lux, Math.hypot(q.long - p.long, q.trans - p.trans)]);
+        }
+        return o;
+      };
+      let use = viz(1, false);
+      if (!use.length) use = viz(1, true);
+      if (!use.length) use = viz(2, true);
+      if (!use.length) continue;
+      const sw = use.reduce((a, [, d]) => a + 1/d, 0);
+      m.set(p.id, use.reduce((a, [v, d]) => a + v/d, 0) / sw);
+    }
+  }
+  return m;
+}
+const gEst = m => p => p.lux != null ? p.lux : (m.get(p.id) ?? null);
+const fmtEst = (p, v) => fmt(v, unid(p) === 'cd/m²' ? 2 : 1);
+const valCel = (p, m) => p.lux != null ? `<td class="n">${fmtVal(p)} ${unid(p)}</td>`
+  : m.has(p.id) ? `<td class="n">${fmtEst(p, m.get(p.id))} ${unid(p)}</td>` : `<td class="n">—</td>`;
+function estBloco(a, ae){
+  const nEst = ae.st.n - a.st.n;
+  if (nEst <= 0) return '';
+  const rows = ae.linhas.filter(l => !l.comp && l.v).map(l => `<dt>${l.k}</dt><dd class="e">${l.v}</dd><dd class="req">${l.r}</dd>`).join('');
+  const falta = ae.st.tot - ae.st.n;
+  return `<div class="estb"><div class="estt">Com estimativa · ${ae.st.n}/${ae.st.tot} pontos (${nEst} estimados)${falta ? ` · ${falta} sem estimativa` : ''}</div><dl class="kv">${rows}</dl></div>`;
+}
+function renderEst(){
+  const b = $('btnEst'); if (!b) return;
+  const bc = $('btnCaso'), pendC = state.pontos.filter(p => p.lux == null).length, medC = state.pontos.length - pendC, nAuto = state.pontos.filter(p => p.auto).length;
+  if (bc) {
+    bc.textContent = nAuto ? 'Desfazer estudo de caso' : 'Gerar estudo de caso';
+    bc.disabled = !state.cfg || (!nAuto && (!pendC || !medC));
+    $('casoBanner').hidden = !casoOn();
+    $('casoBanner').innerHTML = `<b>ESTUDO DE CASO.</b> ${nAuto} ponto(s) preenchido(s) automaticamente aparecem como preenchidos; os arquivos exportados saem identificados como exemplo com valores ilustrativos.`;
+  }
+  const pend = state.pontos.filter(p => p.lux == null).length, med = state.pontos.length - pend;
+  b.textContent = state.estOn ? 'Remover estimativas' : 'Completar pendentes por estimativa';
+  b.disabled = !state.cfg || (!state.estOn && (!pend || !med));
+  const n = estimarPendentes().size;
+  $('estInfo').textContent = state.estOn
+    ? `${n} de ${pend} pendentes estimados${n < pend ? ` · ${pend - n} sem vizinho medido` : ''}. Estimativas não são medições e não mudam os ícones nem a conformidade.`
+    : !med ? 'Meça alguns pontos (ex.: malha alternada) para habilitar.' : !pend ? 'Malha completa: nada a estimar.' : `${pend} ponto(s) pendente(s).`;
+}
+
+/* ---------- Resumo ---------- */
+function stats(arr, g = p => p.lux){
+  const v = arr.map(g).filter(x => x != null);
+  if (!v.length) return {n:0, tot:arr.length};
+  const med = v.reduce((a,b)=>a+b,0) / v.length, min = Math.min(...v), max = Math.max(...v);
+  return {n:v.length, tot:arr.length, med, min, max, u: med > 0 ? min/med : 0};
+}
+/* Status de cada área. Quatro situações (mais "Parcial" enquanto a malha não está completa):
+   Conforme · Verificação complementar · Não atende · Não medido.
+   Linhas com comp:true (fTI, Ev, EIR) são parâmetros que esta malha horizontal não mede: só contam como
+   avaliadas se trouxerem resultado (v) e ok booleano; caso contrário ficam como verificação complementar pendente. */
+const linhaAvaliada = l => !!l.v && typeof l.ok === 'boolean';
+function statusArea(st, linhas){
+  if (!st.tot) return {cls:'na', txt:'Sem pontos'};
+  if (!st.n) return {cls:'na', txt:'Não medido'};
+  if (st.n < st.tot) return {cls:'na', txt:`Parcial ${st.n}/${st.tot}`};
+  if (linhas.some(l => linhaAvaliada(l) && !l.ok)) return {cls:'bad', txt:'Não atende'};
+  if (linhas.some(l => !l.comp && !linhaAvaliada(l))) return {cls:'na', txt:'Não medido'};
+  if (linhas.some(l => l.comp && !linhaAvaliada(l))) return {cls:'warn', txt:'Verificação complementar'};
+  return {cls:'ok', txt:'Conforme'};
+}
+/* Texto, classe de cor e situação de cada linha (usado no resumo da tela e no PDF) */
+function linhaTxt(l, st){
+  if (l.comp && !linhaAvaliada(l)) return {v:'Avaliar à parte', cls:'i', sit:'Verificação complementar'};
+  if (!st.n || !l.v) return {v:'—', cls:'', sit:'Não medido'};
+  return {v:l.v, cls:l.ok ? 'p' : 'f', sit: st.n < st.tot ? 'Parcial' : (l.ok ? 'Atende' : 'Não atende')};
+}
+function cardArea(titulo, st, linhas, extra){
+  const s = statusArea(st, linhas);
+  const rows = linhas.map(l => { const t = linhaTxt(l, st); return `<dt>${l.k}</dt><dd class="${t.cls}">${t.v}</dd><dd class="req">${l.r}</dd>`; }).join('');
+  return `<div class="area"><div class="hd"><b>${titulo}</b><span class="pill ${s.cls}">${s.txt}</span></div><dl class="kv">${rows}</dl>${extra || ''}</div>`;
+}
+/* Áreas avaliadas e suas linhas de requisito (única fonte para a tela e para o PDF) */
+function areasResumo(g = p => p.lux){
+  const c = state.cfg;
+  if (!c) return [];
+  const via = state.pontos.filter(p => p.kind === 'via'), sv = stats(via, g), out = [];
+  if (isM()) {
+    const rm = REQ_M[c.classeC];
+    let ul = Infinity;
+    for (let f=1; f<=c.faixas; f++) {
+      const sc = stats(via.filter(p => p.g === f && Math.abs(p.trans - c.L/2) < 1e-6), g);
+      if (sc.n && sc.n === sc.tot && sc.max > 0) ul = Math.min(ul, sc.min / sc.max);
+    }
+    out.push({titulo:`Via · ${c.classeC} (luminância)`, st:sv, un:'cd/m²', linhas:[
+      {k:'Lméd', v:sv.n?fmt(sv.med)+' cd/m²':'', r:`≥ ${fmt(rm.lmed)} cd/m²`, ok: sv.med >= rm.lmed},
+      {k:'U0', v:sv.n?fmt(sv.u):'', r:`≥ ${fmt(rm.u0)}`, ok: sv.u >= rm.u0},
+      {k:'UL', v:isFinite(ul)?fmt(ul):'', r:`≥ ${fmt(rm.ul)}`, ok: isFinite(ul) ? ul >= rm.ul : undefined},
+      {k:'fTI', v:'', r:`≤ ${rm.ti} %`, comp:true},
+      {k:'EIR', v:'', r:`≥ ${fmt(rm.eir)}`, comp:true}
+    ]});
+  } else {
+    const rc = REQ_C[c.classeC];
+    /* Emín continua sendo calculado (stats) porque U0 = Emín / Eméd, mas não é requisito próprio da classe C */
+    out.push({titulo:`Via · ${c.classeC}`, st:sv, un:'lx', linhas:[
+      {k:'Eméd', v:sv.n?fmt(sv.med)+' lx':'', r:`≥ ${fmt(rc.emed,1)} lx`, ok: sv.med >= rc.emed},
+      {k:'U0', v:sv.n?fmt(sv.u):'', r:`≥ ${fmt(rc.u)}`, ok: sv.u >= rc.u},
+      {k:'fTI', v:'', r:`≤ ${rc.ti} %`, comp:true}
+    ]});
+  }
+  const rp = REQ_P[c.classeP];
+  for (const l of ladosDe(c.calc)) {
+    const sp = stats(state.pontos.filter(p => p.kind === 'p' && p.g === l), g);
+    out.push({titulo:`Passeio ${l} · ${c.classeP}`, st:sp, un:'lx', linhas:[
+      {k:'Eméd', v:sp.n?fmt(sp.med)+' lx':'', r:`≥ ${fmt(rp.emed,1)} lx`, ok: sp.med >= rp.emed},
+      {k:'Emín', v:sp.n?fmt(sp.min)+' lx':'', r:`≥ ${fmt(rp.emin,1)} lx`, ok: sp.min >= rp.emin},
+      {k:'Ev', v:'', r:`≥ ${fmt(rp.ev,1)} lx`, comp:true}
+    ]});
+  }
+  return out;
+}
+function notaResumo(){
+  const c = state.cfg, comPasseio = ladosDe(c.calc).length > 0;
+  const base = isM()
+    ? 'Classe M: U0 = Lmín / Lméd de toda a pista; UL = Lmín / Lmáx na linha central de cada faixa (pior faixa). fTI e EIR não saem desta malha: requisito sujeito a verificação complementar.'
+    : 'U0 = Emín / Eméd. fTI: requisito sujeito a verificação complementar, pois a malha atual realiza medições horizontais.';
+  return base + (comPasseio ? ' Ev: requisito sujeito a verificação complementar, pois a malha atual realiza medições horizontais.' : '')
+    + ' “Verificação complementar” indica parâmetro normativo ainda não medido; não significa não conformidade.'
+    + (state.estOn ? ' Valores interpolados (pontos não medidos) são estimativas por interpolação dos pontos medidos vizinhos: não são medições, não entram na situação de conformidade (que considera apenas pontos medidos) e tendem a suavizar mínimos locais, superestimando U0 e Emín.' : '');
+}
+function renderResumo(){
+  const el = $('resumo');
+  if (!state.cfg) { el.innerHTML = ''; return; }
+  const aes = state.estOn ? areasResumo(gEst(estimarPendentes())) : [];
+  let h = areasResumo().map((a, i) => cardArea(a.titulo, a.st, a.linhas, aes[i] ? estBloco(a, aes[i]) : '')).join('');
+  if (!ladosDe(state.cfg.calc).length) h += `<div class="area"><div class="hd"><b>Passeios</b><span class="pill na">Não existem</span></div><p class="note" style="margin:0">Trecho sem passeio; apenas a via é avaliada.</p></div>`;
+  el.innerHTML = h;
+  $('resumoNote').textContent = notaResumo();
+}
+
+/* ---------- Tabela ---------- */
+function renderTabela(){
+  const f = $('filtro').value, tb = $('tbody'), em = estimarPendentes();
+  const lista = state.pontos.map((p,i)=>[p,i]).filter(([p]) => f==='todos' || (f==='med') === (p.lux != null));
+  tb.innerHTML = lista.map(([p,i]) => `<tr data-i="${i}">
+    <td class="no">${nro(p)}</td>
+    <td><span class="tag" style="background:var(${p.lux!=null?'--ok':p.kind==='via'?'--via':'--ped'})"></span>${esc(areaNome(p))}</td>
+    <td>${grupoNome(p)}</td>
+    <td class="n">${fmt(p.long)}</td><td class="n">${fmt(p.trans)}</td>
+    ${valCel(p, em)}
+    <td>${p.foto?'✓':'—'}</td>
+    <td>${p.hora?hhmm(p.hora):'—'}</td></tr>`).join('')
+    || `<tr><td colspan="8" style="text-align:center;color:var(--muted);cursor:default">Nenhum ponto neste filtro.</td></tr>`;
+  $('filtroInfo').textContent = `${lista.length} de ${state.pontos.length}`;
+}
+
+function renderProgresso(){
+  const tot = state.pontos.length, med = nMed();
+  $('pgCount').textContent = `${med} / ${tot} medidos`;
+  $('pgBar').style.width = tot ? (100*med/tot)+'%' : '0';
+  $('btnProx').textContent = med === tot && tot ? 'Malha completa' : 'Medir próximo pendente';
+  $('btnProx').disabled = med === tot;
+}
+function renderTudo(){ renderMalha(); renderResumo(); renderTabela(); renderProgresso(); renderArmazenamento(); renderEst(); }
+
+/* ================= Armazenamento no aparelho =================
+   1) Automático: banco interno do navegador (IndexedDB) — dados e fotos, vários levantamentos.
+   2) Arquivo .json no aparelho: pasta escolhida (quando o navegador permite) ou Downloads. */
+let _db;
+function db(){
+  if (!_db) _db = new Promise((res, rej) => {
+    try {
+      const r = indexedDB.open('malhaNBR5101', 2);
+      r.onupgradeneeded = () => {
+        const d = r.result;
+        if (!d.objectStoreNames.contains('fotos')) d.createObjectStore('fotos');
+        if (!d.objectStoreNames.contains('levs')) d.createObjectStore('levs', {keyPath:'id'});
+        if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta');
+      };
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(new Error('blocked'));
+    } catch(e) { rej(e); }
+  });
+  return _db;
+}
+function tx(store, mode, fn){
+  return db().then(d => new Promise((res, rej) => {
+    const t = d.transaction(store, mode), out = fn(t.objectStore(store));
+    t.oncomplete = () => res(out && 'result' in out ? out.result : undefined);
+    t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+  }));
+}
+const fk = (pid, id = state.id) => id + '/' + pid;
+const faixaFotos = id => IDBKeyRange.bound(id + '/', id + '/￿');
+const fotoPut = (pid, v) => tx('fotos','readwrite', s => v ? s.put(v, fk(pid)) : s.delete(fk(pid))).catch(()=>{});
+const fotosApagarLev = id => tx('fotos','readwrite', s => s.delete(faixaFotos(id))).catch(()=>{});
+/* compatibilidade com registros salvos por versões intermediárias */
+function normLev(l){
+  const c = l.cfg = l.cfg || {};
+  if (!c.classeC) c.classeC = c.classeV || 'C5';
+  if (!REQ_C[c.classeC] && !REQ_M[c.classeC]) c.classeC = 'C5';
+  if (c.endereco) { c.via = c.via ? `${c.endereco} — ${c.via}` : c.endereco; delete c.endereco; }
+  if (!c.classeP) c.classeP = 'P5';
+  if (Array.isArray(l.pontos)) l.pontos = l.pontos.filter(p => !(p.obs > 1));
+  return l;
+}
+function levLeve(){
+  return { id:state.id, cfg:state.cfg, criado:state.criado, atualizado:state.atualizado, salvoArquivo:state.salvoArquivo||null, estOn:!!state.estOn, exemplo:!!state.exemplo,
+           pontos:state.pontos.map(p => ({...p, foto:null, temFoto:!!p.foto})) };
+}
+async function salvar(opts = {}){
+  if (!state.id) return;
+  state.atualizado = new Date().toISOString();
+  try { localStorage.setItem(LS_ATUAL, state.id); } catch(e) {}
+  try { await tx('levs','readwrite', s => s.put(levLeve())); idbOk = true; }
+  catch(e) { idbOk = false; try { localStorage.setItem(KEY_V2, JSON.stringify(levLeve())); } catch(e2) {} }
+  if (!persistente && navigator.storage && navigator.storage.persist) {
+    try { persistente = await navigator.storage.persist(); } catch(e) {}
+  }
+  if (!opts.semArquivo) agendarArquivo(!!opts.medicao);
+  renderArmazenamento();
+}
+async function listarLevs(){
+  try { const l = await tx('levs','readonly', s => s.getAll()); idbOk = true; return (l||[]).map(normLev).sort((a,b) => (b.atualizado||'').localeCompare(a.atualizado||'')); }
+  catch(e) { idbOk = false; return null; }
+}
+async function fotosCarregar(){
+  try {
+    const d = await db(), id = state.id;
+    await new Promise(res => {
+      const r = d.transaction('fotos').objectStore('fotos').openCursor(faixaFotos(id));
+      r.onsuccess = () => { const c = r.result; if (!c) return res();
+        const p = state.pontos.find(x => x.id === String(c.key).slice(id.length + 1)); if (p) p.foto = c.value; c.continue(); };
+      r.onerror = () => res();
+    });
+  } catch(e) {}
+}
+async function abrirLev(id, silencioso){
+  let l; try { l = await tx('levs','readonly', s => s.get(id)); } catch(e) {}
+  if (!l) return false;
+  normLev(l);
+  pararCamera(); if (!$('modal').hidden) { $('modal').hidden = true; document.body.style.overflow = ''; }
+  state = { ...l, pontos:l.pontos.map(p => ({...p, foto:null})) }; sel = null;
+  try { localStorage.setItem(LS_ATUAL, id); } catch(e) {}
+  escreverCfg(state.cfg); renderTudo();
+  await fotosCarregar(); await carregarHandle();
+  renderTudo(); renderLevs();
+  if (!silencioso) toast(`Aberto: ${state.cfg.via || 'levantamento'} (${nMed()}/${state.pontos.length} medidos).`);
+  return true;
+}
+async function excluirLev(id){
+  const levs = await listarLevs() || [], l = levs.find(x => x.id === id);
+  if (!l) return;
+  const med = l.pontos.filter(p=>p.lux!=null).length;
+  if (!(await confirmar(`Excluir do aparelho o levantamento “${l.cfg.via || 'sem nome'}” (${med} medições)? Arquivos .json já salvos não são afetados.`, 'Excluir', 'danger'))) return;
+  try { await tx('levs','readwrite', s => s.delete(id)); await fotosApagarLev(id); await tx('meta','readwrite', s => s.delete('h/'+id)); } catch(e) {}
+  if (id === state.id) {
+    const resto = (await listarLevs() || []);
+    if (resto.length) await abrirLev(resto[0].id, true); else { state = {id:null,cfg:null,pontos:[]}; await gerar(true); }
+  }
+  renderLevs(); toast('Levantamento excluído do aparelho.');
+}
+async function renderLevs(){
+  const el = $('levs'), levs = await listarLevs();
+  if (!levs) { el.innerHTML = ''; return; }
+  el.innerHTML = levs.map(l => {
+    const tot = l.pontos.length, med = l.pontos.filter(p=>p.lux!=null).length, cur = l.id === state.id;
+    return `<div class="lev${cur?' cur':''}"><div class="info">
+      <div class="t">${esc(l.cfg.via || 'Sem nome')}</div>
+      <div class="s">${esc(l.cfg.municipio)} · ${esc(l.cfg.classeC)}${ladosDe(l.cfg.calc).length ? ' + ' + esc(l.cfg.classeP) : ''} · ${med}/${tot} medidos · alterado ${dataHora(l.atualizado)}</div></div>
+      <div class="acts">${cur ? '<span class="pill ok">Aberto</span>' : `<button class="btn ghost small" data-abrir="${l.id}">Abrir</button>`}
+      <button class="btn danger small" data-excluir="${l.id}" aria-label="Excluir ${esc(l.cfg.via)}">Excluir</button></div></div>`;
+  }).join('');
+}
+
+/* ---------- Arquivo no aparelho ---------- */
+function jsonTexto(){
+  return JSON.stringify({formato:'malhaNBR5101', versao:3, exportadoEm:new Date().toISOString(),
+    id:state.id, criado:state.criado, cfg:state.cfg, estOn:!!state.estOn, exemplo:!!state.exemplo, pontos:state.pontos}, null, 1);
+}
+const baseNome = () => `malha_${slug(state.cfg.municipio)}_${slug(state.cfg.via)}_${state.cfg.classeC}${ladosDe(state.cfg.calc).length?'_'+state.cfg.classeP:''}${casoOn()?'_estudo_de_caso':''}`;
+function baixar(blob, nome){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+async function carregarHandle(){
+  fileHandle = null; arqPendente = false;
+  if (!podeFS || !state.id) return;
+  try { fileHandle = (await tx('meta','readonly', s => s.get('h/'+state.id))) || null; } catch(e) {}
+  if (fileHandle) {
+    try { arqPendente = (await fileHandle.queryPermission({mode:'readwrite'})) !== 'granted'; } catch(e) { arqPendente = true; }
+  }
+}
+async function marcarSalvoArquivo(nome, tipo){
+  state.salvoArquivo = {em:new Date().toISOString(), med:nMed(), nome, tipo};
+  await salvar({semArquivo:true}); renderLevs();
+}
+async function escreverArquivo(interativo){
+  if (!fileHandle) return false;
+  try {
+    let perm = await fileHandle.queryPermission({mode:'readwrite'});
+    if (perm !== 'granted' && interativo) perm = await fileHandle.requestPermission({mode:'readwrite'});
+    if (perm !== 'granted') { arqPendente = true; renderArmazenamento(); return false; }
+    const w = await fileHandle.createWritable();
+    await w.write(new Blob([jsonTexto()], {type:'application/json'})); await w.close();
+    arqPendente = false; await marcarSalvoArquivo(fileHandle.name, 'arquivo');
+    return true;
+  } catch(e) { arqPendente = true; renderArmazenamento(); return false; }
+}
+function baixarJSON(auto){
+  const d = new Date(), ts = d.toISOString().slice(0,10).replace(/-/g,'') + '_' + String(d.getHours()).padStart(2,'0') + String(d.getMinutes()).padStart(2,'0');
+  const nome = `${baseNome()}_${ts}.json`;
+  baixar(new Blob([jsonTexto()], {type:'application/json'}), nome);
+  marcarSalvoArquivo(nome, 'download');
+  toast(auto ? `Cópia automática salva em Downloads: ${nome}` : `Salvo em Downloads: ${nome}`);
+}
+async function salvarArquivo(){
+  if (!state.cfg) return;
+  if (fileHandle) { if (await escreverArquivo(true)) { toast(`Arquivo atualizado: ${fileHandle.name}`); return; } }
+  if (podeFS) {
+    try {
+      fileHandle = await window.showSaveFilePicker({suggestedName: baseNome() + '.json',
+        types:[{description:'Levantamento de malha', accept:{'application/json':['.json']}}]});
+      try { await tx('meta','readwrite', s => s.put(fileHandle, 'h/'+state.id)); } catch(e) {}
+      if (await escreverArquivo(true)) { toast(`Salvo em ${fileHandle.name}. As próximas medições atualizam este arquivo.`); return; }
+    } catch(e) { if (e && e.name === 'AbortError') return; }
+  }
+  baixarJSON(false);
+}
+function agendarArquivo(medicao){
+  if (fileHandle && !arqPendente) { clearTimeout(tArq); tArq = setTimeout(() => escreverArquivo(false), 1200); return; }
+  if (medicao && bkN > 0 && state.pontos.length) {
+    const desde = nMed() - (state.salvoArquivo ? state.salvoArquivo.med : 0);
+    if (desde >= bkN || (nMed() === state.pontos.length && desde > 0)) baixarJSON(true);
+  }
+}
+function renderArmazenamento(){
+  const el = $('store'); if (!el || !state.id) return;
+  const sa = state.salvoArquivo, desde = sa ? nMed() - sa.med : nMed();
+  const l1 = idbOk
+    ? `<span class="okTxt">Salvo automaticamente</span> neste aparelho às ${hhmm(state.atualizado)}${persistente === false ? ' · o navegador pode limpar esses dados se faltar espaço' : ''}`
+    : `<span class="warnTxt">Este navegador não permite guardar dados.</span> Salve em arquivo com frequência.`;
+  let l2;
+  if (fileHandle && arqPendente) l2 = `<span class="warnTxt">Arquivo ${esc(fileHandle.name)} precisa de nova autorização.</span> <button class="btn ghost small" id="btnReconn">Reconectar</button>`;
+  else if (fileHandle) l2 = `<b>${esc(fileHandle.name)}</b> · atualizado a cada medição · último às ${hhmm(sa && sa.em)}`;
+  else if (sa) l2 = `Última cópia: <b>${esc(sa.nome)}</b> (${sa.tipo === 'download' ? 'Downloads' : 'arquivo'}) às ${hhmm(sa.em)}${desde > 0 ? ` · <span class="warnTxt">${desde} medição(ões) ainda não copiadas</span>` : ' · em dia'}`;
+  else l2 = desde > 0 ? `<span class="warnTxt">Nenhuma cópia em arquivo ainda (${desde} medições).</span>` : 'Nenhuma cópia em arquivo ainda.';
+  el.innerHTML = `<div class="row"><span class="k">Navegador</span><span>${l1}</span></div><div class="row"><span class="k">Arquivo</span><span>${l2}</span></div>`;
+  const b = $('btnReconn'); if (b) b.onclick = () => escreverArquivo(true).then(ok => ok && toast('Arquivo reconectado e atualizado.'));
+  $('bkWrap').hidden = !!fileHandle;
+  $('pgSaved').textContent = idbOk ? `salvo ${hhmm(state.atualizado)}` : 'sem salvamento automático';
+}
+
+async function importarJSON(file){
+  if (!file) return;
+  const r = new FileReader();
+  r.onload = async () => {
+    try {
+      const o = JSON.parse(r.result);
+      if (!o || !o.cfg || !Array.isArray(o.pontos)) throw new Error();
+      const levs = await listarLevs() || [];
+      let id = o.id || novoId();
+      if (levs.some(l => l.id === id)) {
+        const r = await pedir('Este levantamento já existe no aparelho.', [{t:'Substituir pela versão do arquivo', v:'sub', cls:'primary'}, {t:'Importar como cópia', v:'copia'}, {t:'Cancelar', v:null}]);
+        if (!r) return;
+        if (r === 'copia') id = novoId();
+      }
+      const l = normLev({ id, criado:o.criado || new Date().toISOString(), cfg:o.cfg, estOn:!!o.estOn, exemplo:!!o.exemplo, pontos:o.pontos.map(p => ({...p})) });
+      state = { ...l, salvoArquivo:{em:new Date().toISOString(), med:l.pontos.filter(p=>p.lux!=null).length, nome:file.name, tipo:'arquivo'} };
+      fileHandle = null; arqPendente = false;
+      await fotosApagarLev(id);
+      for (const p of state.pontos) if (p.foto) await fotoPut(p.id, p.foto);
+      await salvar({semArquivo:true});
+      escreverCfg(state.cfg); renderTudo(); renderLevs();
+      toast(`Aberto do arquivo: ${nMed()} medição(ões).`);
+    } catch(e) { toast('Arquivo inválido. Use um .json salvo por esta ferramenta.'); }
+  };
+  r.readAsText(file);
+}
+
+async function migrarV2(){
+  let o; try { o = JSON.parse(localStorage.getItem(KEY_V2) || 'null'); } catch(e) {}
+  if (!o || !o.cfg || !Array.isArray(o.pontos)) return;
+  state = normLev({ id:o.id || novoId(), criado:new Date().toISOString(), cfg:o.cfg, pontos:o.pontos.map(p => ({...p, foto:null})) });
+  try {
+    for (const p of state.pontos) {
+      const f = await tx('fotos','readonly', s => s.get(p.id));
+      if (f) { await fotoPut(p.id, f); await tx('fotos','readwrite', s => s.delete(p.id)); }
+    }
+  } catch(e) {}
+  await salvar({semArquivo:true});
+  try { localStorage.removeItem(KEY_V2); } catch(e) {}
+}
+
+/* ================= Banco de dados de vias (CSV / XLSX) ================= */
+const COLS = [
+  ['calc',     /existencia|possui (passeio|calcada)|tem (passeio|calcada)|lados? com (passeio|calcada)/],
+  ['classeP',  /classe.*\b(p|passeio|passeios|pedestre|pedestres|calcada|calcadas)\b/],
+  ['classeC',  /classe/],
+  ['Lc1',      /(passeio|calcada|acostamento).*\b(1|01|esq|esquerdo|esquerda)\b/],
+  ['Lc2',      /(passeio|calcada|acostamento).*\b(2|02|dir|direito|direita)\b/],
+  ['Lc',       /passeio|calcada|acostamento/],
+  ['L',        /largura.*faixa|faixa.*largura/],
+  ['faixas',   /\b(n|no|nr|num|numero|qtd|quant|quantidade)\b.*\bfaixas?\b|^faixas$/],
+  ['S',        /distancia.*(lumin|poste)|espacamento|\bvao\b|^s( m)?$|interdistancia/],
+  ['municipio',/municipio|cidade/],
+  ['endereco', /endereco|logradouro|\brua\b|avenida/],
+  ['via',      /\bvia\b|trecho|referencia|\bnome\b/]
+];
+const NOMES = {calc:'Existência de passeio', classeP:'Classe do passeio', classeC:'Classe da via', Lc1:'Passeio lado 1', Lc2:'Passeio lado 2',
+  Lc:'Largura do passeio', L:'Largura da faixa', faixas:'Nº de faixas', S:'Distância entre luminárias', municipio:'Município', endereco:'Endereço', via:'Via / trecho'};
+const CAMPOS = {municipio:'município', via:'via', S:'distância entre luminárias', L:'largura da faixa', faixas:'nº de faixas',
+  calc:'existência de passeio', Lc1:'largura do passeio 1', Lc2:'largura do passeio 2', classeC:'classe da via', classeP:'classe do passeio'};
+
+function mapear(headers){
+  const used = new Set(), map = {};
+  for (const [k, re] of COLS) {
+    const i = headers.findIndex((h, j) => !used.has(j) && norm(h) && re.test(norm(h)));
+    if (i >= 0) { map[k] = i; used.add(i); }
+  }
+  return map;
+}
+function toNum(v){
+  if (typeof v === 'number') return Number.isFinite(v) ? v : NaN;
+  let s = String(v ?? '').trim(); if (!s) return NaN;
+  if (s.includes(',')) s = s.replace(/\./g,'').replace(',', '.');
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g,'');
+  const m = s.match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : NaN;
+}
+function linhaParaCfg(row, map){
+  const g = k => map[k] != null ? row[map[k]] : undefined;
+  const txt = k => { const v = g(k); return v == null ? '' : String(v).trim(); };
+  const o = {};
+  if (txt('municipio')) o.municipio = txt('municipio');
+  const end = txt('endereco'), tr = txt('via');
+  if (end || tr) o.via = end && tr && norm(end) !== norm(tr) ? `${end} — ${tr}` : (end || tr);
+  const S = toNum(g('S')), L = toNum(g('L')), F = toNum(g('faixas'));
+  if (S > 0) o.S = S;
+  if (L > 0) o.L = L;
+  if (F >= 1) o.faixas = Math.min(8, Math.round(F));
+  // classes: aceita “C3”, “M2”, “P4”, “C3 / P4” etc.
+  const cls = ' ' + (txt('classeC') + ' ' + txt('classeP')).toUpperCase();
+  const mv = cls.match(/[^A-Z]([CM])\s*-?\s*([0-6])(?![0-9])/), mp = cls.match(/[^A-Z]P\s*-?\s*([1-6])(?![0-9])/);
+  if (mv) { const c = mv[1] + mv[2]; if (REQ_C[c] || REQ_M[c]) o.classeC = c; }
+  if (mp) o.classeP = 'P' + mp[1];
+  // passeios
+  const ex = norm(txt('calc'));
+  let calc = null;
+  if (ex) {
+    if (/nenhum|inexist|nao possui|nao existe|sem passeio|sem calcada|^(n|nao|no|sem|0|nenhum)$/.test(ex)) calc = 'nenhum';
+    else if (/ambos|dois|bilateral|os dois|^(2|s|sim|x|yes)$/.test(ex)) calc = 'ambos';
+    else if (/lado ?2|direit|^ld$/.test(ex)) calc = 'lado2';
+    else if (/lado ?1|esquerd|um lado|unilateral|apenas um|so um|^(1|le)$/.test(ex)) calc = 'lado1';
+  }
+  const l1 = toNum(g('Lc1')), l2 = toNum(g('Lc2')), lc = toNum(g('Lc'));
+  if (!calc) {
+    if (Number.isFinite(l1) || Number.isFinite(l2)) calc = l1 > 0 && l2 > 0 ? 'ambos' : l1 > 0 ? 'lado1' : l2 > 0 ? 'lado2' : 'nenhum';
+    else if (Number.isFinite(lc)) calc = lc > 0 ? 'ambos' : 'nenhum';
+  }
+  if (calc) o.calc = calc;
+  const w1 = l1 > 0 ? l1 : lc > 0 ? lc : null, w2 = l2 > 0 ? l2 : lc > 0 ? lc : null;
+  if (w1 && ladosDe(o.calc || 'ambos').includes(1)) o.Lc1 = w1;
+  if (w2 && ladosDe(o.calc || 'ambos').includes(2)) o.Lc2 = w2;
+  return o;
+}
+function parseCSV(t){
+  const first = t.split(/\r?\n/, 1)[0] || '';
+  const d = [';', ',', '\t'].map(c => [c, first.split(c).length]).sort((a,b) => b[1]-a[1])[0][0];
+  const out = []; let row = [], f = '', q = false;
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (q) { if (ch === '"') { if (t[i+1] === '"') { f += '"'; i++; } else q = false; } else f += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === d) { row.push(f); f = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && t[i+1] === '\n') i++; row.push(f); out.push(row); row = []; f = ''; }
+    else f += ch;
+  }
+  if (f !== '' || row.length) { row.push(f); out.push(row); }
+  return out;
+}
+/* Leitor de .xlsx embutido (não precisa de internet) */
+function abrirZip(buf){
+  const dv = new DataView(buf), u8 = new Uint8Array(buf), files = {};
+  let e = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 65558); i--) if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new Error('zip');
+  const n = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true);
+  for (let k = 0; k < n && dv.getUint32(p, true) === 0x02014b50; k++) {
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+    const nlen = dv.getUint16(p + 28, true), xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    files[new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen))] = {method, csize, off};
+    p += 46 + nlen + xlen + clen;
+  }
+  return {
+    async texto(nome){
+      const f = files[nome]; if (!f) return null;
+      const ini = f.off + 30 + dv.getUint16(f.off + 26, true) + dv.getUint16(f.off + 28, true);
+      const dados = u8.subarray(ini, ini + f.csize);
+      if (f.method === 0) return new TextDecoder().decode(dados);
+      if (f.method !== 8 || typeof DecompressionStream === 'undefined') throw new Error('deflate');
+      return await new Response(new Blob([dados]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+    }
+  };
+}
+async function lerXLSX(buf){
+  const z = abrirZip(buf);
+  const P = s => new DOMParser().parseFromString(s, 'application/xml');
+  const tags = (d, t) => Array.from(d.getElementsByTagNameNS('*', t));
+  const col = ref => { const m = /^[A-Z]+/.exec(ref || ''); if (!m) return -1; let n = 0; for (const ch of m[0]) n = n*26 + ch.charCodeAt(0) - 64; return n - 1; };
+  const ss = [], sst = await z.texto('xl/sharedStrings.xml');
+  if (sst) for (const si of tags(P(sst), 'si')) ss.push(tags(si, 't').map(t => t.textContent).join(''));
+  const wbTxt = await z.texto('xl/workbook.xml'); if (!wbTxt) throw new Error('xlsx');
+  const rels = {}, relsTxt = await z.texto('xl/_rels/workbook.xml.rels');
+  if (relsTxt) for (const r of tags(P(relsTxt), 'Relationship')) rels[r.getAttribute('Id')] = r.getAttribute('Target');
+  const out = [];
+  for (const sh of tags(P(wbTxt), 'sheet')) {
+    const rid = sh.getAttribute('r:id') || sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+    let alvo = rels[rid]; if (!alvo) continue;
+    alvo = alvo.startsWith('/') ? alvo.slice(1) : 'xl/' + alvo.replace(/^\.\//, '');
+    const x = await z.texto(alvo); if (!x) continue;
+    const rows = [];
+    for (const r of tags(P(x), 'row')) {
+      const ri = (parseInt(r.getAttribute('r'), 10) || rows.length + 1) - 1, arr = [];
+      for (const c of tags(r, 'c')) {
+        const ci = col(c.getAttribute('r')), t = c.getAttribute('t'), v = tags(c, 'v')[0];
+        let val = '';
+        if (t === 's') val = v ? (ss[+v.textContent] ?? '') : '';
+        else if (t === 'inlineStr') val = tags(c, 't').map(e => e.textContent).join('');
+        else if (v) val = (t === 'str' || t === 'e' || isNaN(+v.textContent)) ? v.textContent : +v.textContent;
+        arr[ci >= 0 ? ci : arr.length] = val;
+      }
+      rows[ri] = Array.from(arr, x => x ?? '');
+    }
+    out.push({name: sh.getAttribute('name'), rows: Array.from(rows, x => x || [])});
+  }
+  return out;
+}
+function carregarSheetJS(){
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = () => window.XLSX ? res(window.XLSX) : rej(new Error('xlsx'));
+    s.onerror = () => rej(new Error('xlsx'));
+    document.head.appendChild(s);
+  });
+}
+async function lerCadastro(file){
+  if (!file) return;
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  let sheets;
+  try {
+    const buf = await file.arrayBuffer();
+    if (['xlsx','xlsm','xls','ods'].includes(ext)) {
+      try { if (ext === 'xls' || ext === 'ods') throw new Error('formato'); sheets = await lerXLSX(buf); }
+      catch(e) {
+        let X; try { X = await carregarSheetJS(); }
+        catch(e2) { toast('Não foi possível ler esta planilha sem internet. Salve como .xlsx ou .csv e tente de novo.', 5000); return; }
+        const wb = X.read(buf, {type:'array'});
+        sheets = wb.SheetNames.map(n => ({name:n, rows:X.utils.sheet_to_json(wb.Sheets[n], {header:1, raw:true, defval:''})}));
+      }
+    } else {
+      let txt;
+      try { txt = new TextDecoder('utf-8', {fatal:true}).decode(buf); } catch(e) { txt = new TextDecoder('windows-1252').decode(buf); }
+      sheets = [{name:file.name, rows:parseCSV(txt.replace(/^﻿/, ''))}];
+    }
+  } catch(e) { toast('Não foi possível ler este arquivo.'); return; }
+  let best = null;
+  for (const sh of sheets) for (let r = 0; r < Math.min(15, sh.rows.length); r++) {
+    const map = mapear((sh.rows[r] || []).map(x => String(x ?? '')));
+    const sc = Object.keys(map).length;
+    if (!best || sc > best.sc) best = {sc, sh, r};
+  }
+  if (!best || best.sc < 2) { toast('Não encontrei as colunas da planilha. Use a planilha modelo como referência.', 4500); return; }
+  const headers = best.sh.rows[best.r].map(x => String(x ?? ''));
+  const rows = best.sh.rows.slice(best.r + 1).filter(row => row && row.some(c => String(c ?? '').trim() !== ''));
+  cadastro = {nome:file.name, aba:best.sh.name, headers, rows};
+  try { await tx('meta','readwrite', s => s.put(cadastro, 'cadastroVias')); } catch(e) {}
+  $('cadBusca').value = ''; cadF = {col:null, val:''}; cadSel = null; salvarFiltro();
+  renderCadastro();
+  toast(`Banco de dados carregado: ${rows.length} vias. Escolha o filtro e o endereço.`, 4000);
+  setTimeout(() => $('cadCol').focus(), 300);
+}
+const LS_CADF = 'malhaNBR5101.cadFiltro';
+let cadF = {col:null, val:''}, cadSel = null;
+function salvarFiltro(){ try { localStorage.setItem(LS_CADF, JSON.stringify({...cadF, sel:cadSel})); } catch(e) {} }
+function lerFiltro(){ try { const o = JSON.parse(localStorage.getItem(LS_CADF) || 'null'); if (o) { cadF = {col:o.col, val:o.val || ''}; cadSel = o.sel ?? null; } } catch(e) {} }
+const ordenar = (a, b) => a.localeCompare(b, 'pt-BR', {numeric:true, sensitivity:'base'});
+function opcoesFiltro(){
+  const map = mapear(cadastro.headers), H = cadastro.headers;
+  if (cadF.col == null || cadF.col >= H.length || (cadF.col >= 0 && !String(H[cadF.col]).trim())) cadF.col = map.municipio ?? -1;
+  $('cadCol').innerHTML = '<option value="-1">Sem filtro</option>' +
+    H.map((h, i) => [h, i]).filter(([h]) => String(h).trim()).map(([h, i]) => `<option value="${i}">${esc(h)}</option>`).join('');
+  $('cadCol').value = String(cadF.col);
+}
+function valoresFiltro(){
+  const c = cadF.col, s = $('cadVal');
+  if (c < 0) { s.innerHTML = '<option value="">—</option>'; s.disabled = true; cadF.val = ''; return; }
+  s.disabled = false;
+  const cnt = new Map();
+  for (const r of cadastro.rows) { const v = String(r[c] ?? '').trim(); if (v) cnt.set(v, (cnt.get(v) || 0) + 1); }
+  if (cadF.val && !cnt.has(cadF.val)) cadF.val = '';
+  s.innerHTML = `<option value="">Todos (${cadastro.rows.length})</option>` +
+    [...cnt.keys()].sort(ordenar).map(v => `<option value="${esc(v)}">${esc(v)} (${cnt.get(v)})</option>`).join('');
+  s.value = cadF.val;
+}
+function listaEnderecos(){
+  const map = mapear(cadastro.headers), q = norm($('cadBusca').value);
+  const lista = cadastro.rows.map((row, i) => ({i, row, o:linhaParaCfg(row, map)}))
+    .filter(x => cadF.col < 0 || !cadF.val || String(x.row[cadF.col] ?? '').trim() === cadF.val)
+    .filter(x => !q || norm(x.o.via || '').includes(q) || norm(x.row.join(' ')).includes(q))
+    .sort((a, b) => ordenar(a.o.via || '', b.o.via || ''));
+  const mostraMun = cadF.col !== map.municipio || !cadF.val;
+  const s = $('cadEnd');
+  s.innerHTML = `<option value="">${lista.length ? `Escolha o endereço (${lista.length})` : 'Nenhum endereço com este filtro'}</option>` +
+    lista.map(x => `<option value="${x.i}">${esc(x.o.via || 'Linha ' + (x.i + 1))}${mostraMun && x.o.municipio ? ' · ' + esc(x.o.municipio) : ''}</option>`).join('');
+  s.value = cadSel != null && lista.some(x => x.i === cadSel) ? String(cadSel) : '';
+}
+function renderCadastro(){
+  $('cadInfo').hidden = !cadastro; $('cadNote').hidden = !!cadastro;
+  if (!cadastro) return;
+  const map = mapear(cadastro.headers), {headers, rows} = cadastro;
+  const rec = Object.entries(map).map(([k, i]) => `<b>${NOMES[k]}</b> ← “${esc(headers[i])}”`).join(' · ');
+  const usados = new Set(Object.values(map));
+  const ign = headers.map((h, i) => [h, i]).filter(([h, i]) => String(h).trim() && !usados.has(i)).map(([h]) => `“${esc(h)}”`);
+  $('cadResumo').textContent = `${cadastro.nome}${cadastro.aba && cadastro.aba !== cadastro.nome ? ` (aba ${cadastro.aba})` : ''} · ${rows.length} vias · ver colunas reconhecidas`;
+  $('cadMaps').innerHTML = `Colunas reconhecidas: ${rec || '—'}${ign.length ? `<br>Colunas ignoradas (podem ser usadas como filtro): ${ign.join(', ')}` : ''}`;
+  opcoesFiltro(); valoresFiltro(); listaEnderecos();
+}
+function resumoLinha(o){
+  const p = [];
+  if (o.municipio) p.push(esc(o.municipio));
+  if (o.classeC) p.push(o.classeC + (o.classeP && o.calc !== 'nenhum' ? ' + ' + o.classeP : ''));
+  if (o.S) p.push(`S ${fmt(o.S,1)} m`);
+  if (o.faixas) p.push(`${o.faixas} faixa${o.faixas > 1 ? 's' : ''}${o.L ? ' de ' + fmt(o.L) + ' m' : ''}`);
+  if (o.calc) p.push('passeio: ' + LADO_TXT[o.calc]);
+  return p.join(' · ');
+}
+async function aplicarLinha(i){
+  const o = linhaParaCfg(cadastro.rows[i], mapear(cadastro.headers));
+  let novo = false;
+  if (nMed() > 0) {
+    if (!(await confirmar(`O levantamento aberto tem ${nMed()} medição(ões). Para “${o.via || 'esta via'}” será criado um novo levantamento; o atual continua salvo.`, 'Criar novo levantamento'))) {
+      listaEnderecos(); return;
+    }
+    novo = true;
+  }
+  cadSel = i; salvarFiltro();
+  escreverCfg({...lerCfg(), ...o});
+  const ls = ladosDe(lerCfg().calc);
+  const faltam = Object.keys(CAMPOS).filter(k => o[k] == null && !(k === 'Lc1' && !ls.includes(1)) && !(k === 'Lc2' && !ls.includes(2)) && !(k === 'classeP' && !ls.length));
+  const preench = Object.keys(CAMPOS).filter(k => o[k] != null);
+  marcarAuto(preench);
+  const ok = await gerar(novo, true);
+  if (!ok) {
+    const err = validar(lerCfg());
+    if (err) { mostrarErro(err, true); toast(`A planilha não traz este dado para “${o.via || 'esta via'}”. Complete o campo em vermelho; a malha é gerada em seguida.`, 6000); }
+    return;
+  }
+  renderLevs();
+  toast(`Malha gerada para ${o.via || 'a via'}: ${preench.length} campos preenchidos pela planilha.${faltam.length ? ' Não estavam na planilha (mantidos como estavam): ' + faltam.map(k => CAMPOS[k]).join(', ') + '.' : ''}`, 6500);
+}
+function baixarModelo(){
+  const h = ['Município','Via do trecho (endereço)','Distância entre luminárias (m)','Largura da faixa (m)','Nº de faixas',
+    'Existência de passeio','Largura passeio lado 1 (m)','Largura passeio lado 2 (m)','Classe da via (C ou M)','Classe do passeio (P)'];
+  const ex = [
+    ['Arujá/SP','EXEMPLO — Rua A, trecho 01','30','3,5','2','Ambos','2,5','2,0','C3','P4'],
+    ['Patos/PB','EXEMPLO — Avenida B','35','3,5','4','Lado 1','3,0','','C2','P3'],
+    ['Cambé/PR','EXEMPLO — Rodovia C, km 2','40','3,6','2','Nenhum','','','M3','']
+  ];
+  const q = x => '"' + String(x).replace(/"/g,'""') + '"';
+  baixar(new Blob(['﻿' + [h, ...ex].map(r => r.map(q).join(';')).join('\r\n')], {type:'text/csv;charset=utf-8'}), 'banco_vias_modelo.csv');
+  toast('Modelo salvo em Downloads. Substitua as linhas de exemplo pelas vias reais.', 4000);
+}
+
+async function restaurar(){
+  try { const v = localStorage.getItem(LS_BK); if (v !== null) bkN = +v; } catch(e) {}
+  $('bkN').value = String(bkN);
+  if (navigator.storage && navigator.storage.persisted) { try { persistente = await navigator.storage.persisted(); } catch(e) {} }
+  try { cadastro = (await tx('meta','readonly', s => s.get('cadastroVias'))) || null; } catch(e) {}
+  lerFiltro(); renderCadastro();
+  let levs = await listarLevs();
+  if (levs && !levs.length) { await migrarV2(); levs = await listarLevs(); }
+  if (levs && levs.length) {
+    let alvo = null; try { alvo = localStorage.getItem(LS_ATUAL); } catch(e) {}
+    const l = levs.find(x => x.id === alvo) || levs[0];
+    await abrirLev(l.id, true);
+    const m = nMed(); if (m) toast(`Levantamento retomado: ${m} medição(ões).`);
+    return;
+  }
+  if (!levs) {
+    try { const o = JSON.parse(localStorage.getItem(KEY_V2) || 'null'); if (o && o.cfg) { state = normLev({...o, id:o.id || novoId()}); escreverCfg(state.cfg); renderTudo(); return; } } catch(e) {}
+  }
+  $('data').value = new Date().toISOString().slice(0,10);
+  syncCalcUI(); await gerar(true, true);
+}
+
+/* ---------- Modal de medição ---------- */
+function abrir(i){
+  sel = i; const p = state.pontos[i], c = state.cfg, k = nro(p);
+  fotoTemp = undefined;
+  $('mNo').textContent = k;
+  $('mNo').style.background = p.lux != null ? 'var(--ok)' : p.kind === 'via' ? 'var(--via)' : 'var(--ped)';
+  $('mNome').textContent = `Ponto ${k}`;
+  $('mArea').textContent = `${areaNome(p)} · ${grupoNome(p)}`;
+  $('mArea').style.color = p.kind === 'via' ? 'var(--via)' : 'var(--ped)';
+  const lum = unid(p) === 'cd/m²';
+  $('mInfo').innerHTML = `<dt>Via</dt><dd style="text-align:left;font-family:var(--f-ui)">${esc(c.via)}</dd>
+    <dt>Longitudinal</dt><dd style="text-align:left">${fmt(p.long)} m da luminária inicial</dd>
+    <dt>Transversal</dt><dd style="text-align:left">${fmt(p.trans)} m ${p.kind==='via'?'da borda da faixa':'do meio-fio'}</dd>
+    ${lum ? `<dt>Observador</dt><dd style="text-align:left;font-family:var(--f-ui)">Centro da faixa, 1,5 m de altura, 60 m antes da área, no sentido do fluxo</dd>` : ''}`;
+  $('luxLbl').textContent = lum ? 'Luminância lida no luminancímetro (cd/m²)' : 'Iluminância lida no luxímetro (lx)';
+  $('lux').placeholder = lum ? '0,00' : '0,0';
+  try { $('luxAutoBox').hidden = lum; if (!LA.conf || LA.conf.id !== p.id) LA.conf = null; } catch (e) {}
+  $('lux').value = p.lux == null ? '' : String(p.lux).replace('.', ',') + ' ' + unid(p);
+  $('camNote').textContent = podeLive ? '' : '“Tirar foto” abre a câmera nativa do celular e funciona mesmo com o arquivo aberto direto do aparelho.';
+  $('luxErr').hidden = true;
+  $('btnApagar').hidden = p.lux == null;
+  pararCamera();
+  mostrarFoto(p.foto);
+  $('modal').hidden = false;
+  document.body.style.overflow = 'hidden';
+  renderMalha();
+  setTimeout(() => { if (!matchMedia('(pointer:coarse)').matches) $('lux').focus(); }, 50);
+}
+function fechar(){
+  pararCamera(); $('modal').hidden = true; document.body.style.overflow = '';
+  sel = null; renderMalha();
+}
+function mostrarFoto(src){
+  $('preview').hidden = !src; if (src) $('preview').src = src; else $('preview').removeAttribute('src');
+  $('fotoVazia').hidden = !!src || !$('video').hidden;
+  $('btnTiraFoto').hidden = !src;
+}
+function proximoPendente(from){
+  const n = state.pontos.length;
+  for (let k=1; k<=n; k++) { const i = ((from ?? -1) + k) % n; if (state.pontos[i].lux == null) return i; }
+  return null;
+}
+/* valor do campo: aceita "12,4", "12,4 lx" ou "12,4lx"; a unidade é a do ponto (lx, ou cd/m² na via classe M) */
+const luxDoCampo = t => { const m = String(t).trim().replace(/\s*(lx|lux|cd\/m²|cd\/m2)\s*$/i, ''); return /^\d+(?:[.,]\d+)?$/.test(m) ? num(m) : NaN; };
+async function salvarPonto(irProx){
+  if (sel == null) return;
+  const raw = $('lux').value.trim(), v = luxDoCampo(raw);
+  if (raw === '' || !isFinite(v) || v < 0 || v > 200000) {
+    $('luxErr').textContent = `Digite a leitura do instrumento (ex.: 12,4 ${unid(state.pontos[sel])}).`; $('luxErr').hidden = false; $('lux').focus(); return;
+  }
+  const p = state.pontos[sel], idx = sel;
+  p.lux = Math.round(v*1000)/1000; p.hora = new Date().toISOString(); delete p.auto; delete p.imp;
+  if (LA.conf && LA.conf.id === p.id && Math.abs(LA.conf.v - v) < 1e-9) p.ocr = true; else delete p.ocr;
+  if (fotoTemp !== undefined) { p.foto = fotoTemp; fotoPut(p.id, fotoTemp); }
+  const prox = irProx ? proximoPendente(idx) : null;
+  fechar(); renderTudo();
+  if (irProx) { if (prox != null) abrir(prox); else toast('Todos os pontos foram medidos.'); }
+  else toast(`Ponto ${nro(p)} salvo: ${fmtVal(p)} ${unid(p)}`);
+  await salvar({medicao:true}); renderLevs();
+}
+async function apagarPonto(){
+  if (sel == null) return;
+  const p = state.pontos[sel];
+  if (!(await confirmar(`Apagar a medição do ponto ${nro(p)}?`, 'Apagar', 'danger'))) return;
+  p.lux = null; p.foto = null; p.hora = null; delete p.auto; delete p.imp; delete p.ocr; fotoPut(p.id, null);
+  fechar(); renderTudo(); await salvar(); renderLevs();
+}
+
+/* ---------- Foto: redimensiona e carimba o número do ponto ---------- */
+function carimbar(fonte, w0, h0){
+  const p = state.pontos[sel], c = cfgExp(), k = nro(p);
+  const f = Math.min(1, 1000 / Math.max(w0, h0));
+  const w = Math.round(w0*f), h = Math.round(h0*f);
+  const fs = Math.max(14, Math.round(w * .026)), bar = Math.round(fs * 2.9);
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h + bar;
+  const g = cv.getContext('2d');
+  g.drawImage(fonte, 0, 0, w, h);
+  const rr = Math.round(fs * 1.5), cx = rr + fs*.6, cy = rr + fs*.6;
+  g.beginPath(); g.arc(cx, cy, rr, 0, Math.PI*2);
+  g.fillStyle = p.kind === 'via' ? '#f57c00' : '#1976d2'; g.fill();
+  g.lineWidth = Math.max(3, fs*.18); g.strokeStyle = '#ffffff'; g.stroke();
+  g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = `800 ${Math.round(rr * (k >= 100 ? .85 : 1.05))}px system-ui,sans-serif`;
+  g.fillText(String(k), cx, cy + 1);
+  g.textAlign = 'left';
+  g.fillStyle = '#0d1b27'; g.fillRect(0, h, w, bar);
+  g.fillStyle = '#ffffff'; g.font = `bold ${fs}px system-ui,sans-serif`;
+  g.fillText(`Ponto ${k} · ${areaNome(p)} · ${grupoNome(p)} · x ${fmt(p.long)} m · y ${fmt(p.trans)} m`, fs*.6, h + bar*.3, w - fs*1.2);
+  g.font = `${Math.round(fs*.85)}px system-ui,sans-serif`; g.fillStyle = '#c9d6e2';
+  g.fillText(`${c.municipio} — ${c.via} · ${new Date().toLocaleString('pt-BR')}`, fs*.6, h + bar*.72, w - fs*1.2);
+  return cv.toDataURL('image/jpeg', .8);
+}
+/* Toda foto anexada ao ponto (Tirar foto, Galeria, Capturar) passa pelo leitor do visor: se o número for reconhecido,
+   o campo é preenchido com valor e unidade para conferência; nada é gravado sem tocar em Salvar. Um valor já digitado
+   no campo não é substituído. */
+async function laAutoPreencher(src){
+  if (sel == null) return; const p = state.pontos[sel], id = p.id, nota = $('camNote');
+  const vivo = () => !$('modal').hidden && sel != null && state.pontos[sel] && state.pontos[sel].id === id;
+  nota.textContent = 'Lendo o valor do visor na foto…';
+  await new Promise(res => setTimeout(res, 30));
+  let r = laLerGirando(src);
+  if (r.valor == null) {
+    const b0 = LA.busca;
+    const achou = await laProcurar(src, f => { if (vivo()) nota.textContent = `Procurando o visor na foto… ${Math.round(f * 100)}%`; }, vivo);
+    if (!vivo() || LA.busca !== b0) return;
+    if (achou) { r = achou.r; if (!achou.ang) { LA.cal.roi = achou.roi; laSalvarCal(); } }
+  }
+  if (!vivo()) return;
+  laDesenharPrev(r);
+  if (r.valor == null) {
+    nota.textContent = `Valor não reconhecido nesta foto (${(LA_MSG[r.falha] || 'visor não encontrado').replace(/:.*$/, '').toLowerCase()}). Digite a leitura, ou use “Leitura automática do luxímetro” › “Ler valor de uma foto” e marque o visor com o dedo.`;
+    return;
+  }
+  const lido = r.valor, v = laReal(lido), txt = laMult() > 1 ? `${laNum(lido)} × ${laMult()} = ${laNum(v)} ${unid(p)}` : `${laNum(v)} ${unid(p)}`;
+  const atual = luxDoCampo($('lux').value);
+  if ($('lux').value.trim() !== '' && isFinite(atual) && Math.abs(atual - v) > 1e-9) {
+    nota.textContent = `Visor lido na foto: ${txt}. O campo foi mantido com o valor já digitado (${$('lux').value.trim()}).`;
+    return;
+  }
+  $('lux').value = laNum(v) + ' ' + unid(p); $('luxErr').hidden = true; LA.conf = {id, v};
+  nota.textContent = `Valor lido do visor: ${txt}${laMult() === 1 ? '' : ' (multiplicador do visor)'}. Confira com o display e toque em Salvar.`;
+  toast(`Leitura ${txt} preenchida. Confira e salve.`);
+}
+function lerArquivoFoto(file){
+  if (!file) return;
+  const url = URL.createObjectURL(file), img = new Image();
+  img.onload = () => { fotoTemp = carimbar(img, img.naturalWidth, img.naturalHeight); mostrarFoto(fotoTemp); laAutoPreencher(img).finally(() => URL.revokeObjectURL(url)); };
+  img.onerror = () => { URL.revokeObjectURL(url); toast('Não foi possível ler esta imagem.'); };
+  img.src = url;
+}
+const podeLive = !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+async function iniciarCamera(){
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}, width:{ideal:1920}}, audio:false});
+    const v = $('video'); v.srcObject = stream; v.hidden = false; $('preview').hidden = true; $('fotoVazia').hidden = true;
+    $('btnSnap').hidden = false; $('btnLive').textContent = 'Fechar câmera';
+  } catch(e) { toast('A câmera ao vivo foi bloqueada. Use “Tirar foto”.'); pararCamera(); }
+}
+function pararCamera(){
+  try { laStop(); } catch (e) {}
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  const v = $('video'); v.srcObject = null; v.hidden = true;
+  $('btnSnap').hidden = true; $('btnLive').textContent = 'Câmera ao vivo';
+  if (!$('modal').hidden) mostrarFoto(fotoTemp !== undefined ? fotoTemp : (sel != null ? state.pontos[sel].foto : null));
+}
+function capturar(){
+  const v = $('video'); if (!v.videoWidth) return;
+  const quadro = laSnapshot(v);
+  fotoTemp = carimbar(v, v.videoWidth, v.videoHeight); pararCamera(); mostrarFoto(fotoTemp); laAutoPreencher(quadro);
+}
+
+/* ---------- Exportações ---------- */
+function exportarCSV(){
+  const em = estimarPendentes(), c = cfgExp(), q = x => '"' + String(x ?? '').replace(/"/g,'""') + '"';
+  const n = (x,d) => x == null ? '' : Number(x).toFixed(d).replace('.', ',');
+  const rows = [['Município','Via','Data','Responsável','Instrumento','Nº','Área','Classe','Grupo','Longitudinal_m','Transversal_m','Valor','Unidade','Foto','Hora','Observações'].concat(state.estOn ? ['Valor_estimado'] : [], casoOn() || impN() || ocrN() ? ['Origem'] : [])];
+  state.pontos.forEach(p => rows.push([c.municipio, c.via, c.data, c.resp, c.luximetro, nro(p), p.kind==='via'?'Via':'Passeio',
+    p.kind==='via'?c.classeC:c.classeP, grupoNome(p), n(p.long,2), n(p.trans,2), n(p.lux,3), unid(p), p.foto?'Sim':'Não',
+    p.hora ? new Date(p.hora).toLocaleString('pt-BR') : '', c.obs || ''].concat(state.estOn ? [p.lux == null && em.has(p.id) ? n(em.get(p.id), 3) : ''] : [], casoOn() || impN() || ocrN() ? [p.auto ? 'ilustrativo' : p.imp ? 'folha de campo' : p.ocr ? 'visor lido pela câmera (conferido)' : p.lux != null ? 'medido' : ''] : [])));
+  baixar(new Blob(['﻿' + rows.map(r => r.map(q).join(';')).join('\r\n')], {type:'text/csv;charset=utf-8'}), baseNome()+'.csv');
+}
+function exportarRelatorio(){
+  const c = cfgExp(), {W, H, s} = svgMalha();
+  const tokensLight = TOKENS_LIGHT;
+  const med = nMed(), em = estimarPendentes(), fotos = state.pontos.filter(p => p.foto), ls = ladosDe(c.calc);
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Relatório de medição — ${esc(c.via)}</title><style>:root{${tokensLight}}
+body{font:14px/1.45 system-ui,Arial,sans-serif;color:var(--fg);margin:24px;max-width:1100px}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:24px 0 8px;border-bottom:2px solid var(--brand);padding-bottom:4px}
+table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid var(--line);padding:5px 7px;text-align:left}th{background:var(--surface-2)}
+td.n{text-align:right;font-family:var(--f-num)}.meta td:first-child{font-weight:700;width:200px;background:var(--surface-2)}
+.svg{overflow-x:auto;border:1px solid var(--line)}svg{max-width:100%;height:auto;display:block}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.area{border:1px solid var(--line);padding:10px;border-radius:6px}
+.area .hd{display:flex;justify-content:space-between;margin-bottom:6px}.pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}.pill.bad{background:var(--bad-bg);color:var(--bad)}.pill.warn{background:var(--warn-bg);color:var(--warn)}.pill.na{background:var(--surface-2);color:var(--muted)}
+.kv{display:grid;grid-template-columns:auto 1fr auto;gap:3px 10px;margin:0}.kv dt{color:var(--muted)}.kv dd{margin:0;text-align:right;font-family:var(--f-num)}.kv .req{color:var(--muted)}.kv .f{color:var(--bad)}.kv .p{color:var(--ok)}.kv .i{color:var(--muted);font-family:var(--f-ui)}
+.fotos{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.fotos figure{margin:0;border:1px solid var(--line);page-break-inside:avoid}
+.fotos img{width:100%;display:block}.fotos figcaption{padding:5px 7px;font-size:12px}.note{color:var(--muted);font-size:12px}
+${SVG_CSS}${EST_CSS}</style></head><body>
+<h1>Relatório de medição — NBR 5101:2024</h1>
+<div class="note">Gerado em ${new Date().toLocaleString('pt-BR')}</div>
+${casoOn() ? `<div class="metodo" style="border-color:var(--bad)"><b>ESTUDO DE CASO.</b> Documento de exemplo com valores ilustrativos; não constitui levantamento de campo nem laudo.</div>` : ''}${state.estOn && em.size ? `<div class="metodo"><b>Metodologia de levantamento.</b> ${esc(metodoTxt(med, state.pontos.length, em.size))}</div>` : ''}
+<h2>Identificação</h2><table class="meta">
+<tr><td>Município</td><td>${esc(c.municipio)}</td></tr><tr><td>Via do trecho</td><td>${esc(c.via)}</td></tr>
+<tr><td>Data</td><td>${esc(c.data ? c.data.split('-').reverse().join('/') : '')}</td></tr><tr><td>Responsável</td><td>${esc(c.resp)}</td></tr>
+<tr><td>Instrumento</td><td>${esc(c.luximetro)}</td></tr>
+<tr><td>Geometria</td><td>S = ${fmt(c.S)} m · ${c.faixas} faixa(s) de ${fmt(c.L)} m · passeios: ${ls.length? ls.map(l=>`lado ${l} (${fmt(c['Lc'+l])} m)`).join(', ') : 'nenhum'}</td></tr>
+<tr><td>Classes</td><td>Via ${c.classeC}${isM() ? ' (luminância, cd/m²)' : ' (iluminância, lx)'}${ls.length?` · Passeio ${c.classeP}`:''}</td></tr>
+<tr><td>Pontos medidos</td><td>${med} de ${state.pontos.length}</td></tr></table>
+<h2>Resumo de conformidade</h2><div class="cards">${$('resumo').innerHTML}</div>
+<p class="note">${esc($('resumoNote').textContent)}</p>
+<h2>Malha</h2><div class="svg"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${s}</svg></div>
+${c.obs ? `<h2>Observações</h2><p style="white-space:pre-wrap">${esc(c.obs)}</p>` : ''}
+<h2>Registros</h2><table><tr><th>Nº</th><th>Área</th><th>Grupo</th><th>Long. (m)</th><th>Transv. (m)</th><th>Valor</th><th>Foto</th><th>Hora</th></tr>
+${state.pontos.map(p=>`<tr><td><b>${nro(p)}</b></td><td>${esc(areaNome(p))}</td><td>${grupoNome(p)}</td><td class="n">${fmt(p.long)}</td><td class="n">${fmt(p.trans)}</td>${valCel(p, em)}<td>${p.foto?'Sim':'—'}</td><td>${p.hora?hhmm(p.hora):'—'}</td></tr>`).join('')}</table>
+${fotos.length?`<h2>Registro fotográfico (${fotos.length})</h2><div class="fotos">${fotos.map(p=>`<figure><img src="${p.foto}" alt="Ponto ${nro(p)}"><figcaption><b>Ponto ${nro(p)}</b> · ${esc(grupoNome(p))} · ${p.lux==null?'—':fmtVal(p)+' '+unid(p)}</figcaption></figure>`).join('')}</div>`:''}
+</body></html>`;
+  baixar(new Blob([html], {type:'text/html;charset=utf-8'}), 'relatorio_' + baseNome() + '.html');
+}
+
+/* ================= Exportação em PDF =================
+   Gerador de PDF embutido (sem bibliotecas, funciona offline): texto em Helvetica/Symbol (fontes padrão do PDF),
+   tabelas vetoriais e a malha como imagem JPEG rasterizada a partir do próprio SVG da tela (svgMalha()). */
+const TOKENS_LIGHT = `--brand:#1769aa;--via:#f57c00;--ped:#1976d2;--ok:#159447;--bad:#c62f2f;--warn:#a86400;--bg:#fff;--surface:#fff;--surface-2:#eaf0f5;--line:#d3dde6;--fg:#1b2833;--muted:#5a6a78;--asphalt:#33383e;--walk:#cfd6db;--walkjoint:#b5bfc6;--verge:#b3c2a3;--curb:#8e9ba5;--mark:#eef1f3;--ok-bg:#e2f4e9;--bad-bg:#fbe6e6;--warn-bg:#fff0dc;--f-num:ui-monospace,Menlo,monospace;--f-ui:system-ui,sans-serif`;
+const PDF_COR = {brand:'#1769aa', fg:'#1b2833', muted:'#5a6a78', line:'#d3dde6', cab:'#eaf0f5', zebra:'#f6f9fb',
+  ok:'#159447', bad:'#c62f2f', warn:'#a86400', okBg:'#e2f4e9', badBg:'#fbe6e6', warnBg:'#fff0dc', via:'#f57c00', ped:'#1976d2'};
+const PDF_PILL = {ok:['#159447','#e2f4e9'], bad:['#c62f2f','#fbe6e6'], warn:['#a86400','#fff0dc'], na:['#5a6a78','#eaf0f5']};
+/* larguras AFM (1/1000 em) dos caracteres ASCII 32–126 */
+const PDF_WR = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278, 556,556,556,556,556,556,556,556,556,556,
+  278,278,584,584,584,556,1015, 667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,
+  278,278,278,469,556,333, 556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500, 334,260,334,584];
+const PDF_WB = [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278, 556,556,556,556,556,556,556,556,556,556,
+  333,333,584,584,584,611,975, 722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,
+  333,278,333,584,556,333, 556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500, 389,280,389,584];
+/* caracteres fora do ASCII: [código WinAnsi, largura regular, largura negrito] */
+const PDF_ESP = {'·':[183,278,278],'°':[176,400,400],'²':[178,333,333],'³':[179,333,333],'ª':[170,370,370],'º':[186,365,365],'×':[215,584,584],
+  '±':[177,584,584],'§':[167,556,556],'µ':[181,556,611],'¿':[191,611,611],'¡':[161,333,333],'«':[171,556,556],'»':[187,556,556],'\u00a0':[160,278,278],
+  '…':[133,1000,1000],'‘':[145,222,278],'’':[146,222,278],'“':[147,333,500],'”':[148,333,500],'•':[149,350,350],'–':[150,556,556],'—':[151,1000,1000],'™':[153,1000,1000],'€':[128,556,556]};
+/* divide o texto em trechos por fonte (≥ e ≤ vêm da fonte Symbol, que não existe em WinAnsi) */
+function pdfSegs(str, bold){
+  const out = []; let last = null;
+  const push = (f, b, w) => { if (last && last.f === f) { last.b.push(b); last.w += w; } else { last = {f, b:[b], w}; out.push(last); } };
+  const tab = bold ? PDF_WB : PDF_WR;
+  for (const ch of String(str ?? '').replace(/[\t\r\n]+/g, ' ')) {
+    const cp = ch.codePointAt(0), f = bold ? 'F2' : 'F1';
+    if (ch === '≥') { push('F3', 0xB3, 549); continue; }
+    if (ch === '≤') { push('F3', 0xA3, 549); continue; }
+    if (cp >= 32 && cp <= 126) { push(f, cp, tab[cp - 32]); continue; }
+    if (PDF_ESP[ch]) { const e = PDF_ESP[ch]; push(f, e[0], bold ? e[2] : e[1]); continue; }
+    if (cp >= 160 && cp <= 255) {
+      const base = ch.normalize('NFD')[0], bc = base.charCodeAt(0);
+      push(f, cp, (base !== ch && bc >= 32 && bc <= 126) ? tab[bc - 32] : (bold ? 611 : 556)); continue;
+    }
+    push(f, 63, bold ? 611 : 556);
+  }
+  return out;
+}
+const pdfLarg = (s, size, bold) => pdfSegs(s, bold).reduce((a, g) => a + g.w, 0) * size / 1000;
+const pdfCor = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => (v / 255).toFixed(3)).join(' '); };
+const pdfN = n => String(Math.round(n * 100) / 100);
+const pdfAscii = s => { const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i) & 255; return u; };
+
+function criarPDF(){
+  const pags = [], A4 = [595.28, 841.89]; let cur = null;
+  return {
+    pagina(paisagem){ const [w, h] = paisagem ? [A4[1], A4[0]] : A4; cur = {w, h, ops:[], imgs:[]}; pags.push(cur); },
+    usar(i){ cur = pags[i]; },
+    get n(){ return pags.length; }, get pw(){ return cur.w; }, get ph(){ return cur.h; },
+    texto(str, x, y, o = {}){
+      const size = o.size || 10, segs = pdfSegs(str, !!o.bold), tw = segs.reduce((a, g) => a + g.w, 0) * size / 1000;
+      let px = o.align === 'r' ? x - tw : o.align === 'c' ? x - tw / 2 : x;
+      cur.ops.push(`${pdfCor(o.color || '#1b2833')} rg`);
+      for (const g of segs) {
+        cur.ops.push(`BT /${g.f} ${pdfN(size)} Tf ${pdfN(px)} ${pdfN(cur.h - y)} Td <${g.b.map(b => b.toString(16).padStart(2, '0')).join('')}> Tj ET`);
+        px += g.w * size / 1000;
+      }
+    },
+    retangulo(x, y, w, h, o = {}){
+      const r = `${pdfN(x)} ${pdfN(cur.h - y - h)} ${pdfN(w)} ${pdfN(h)} re`;
+      if (o.fill) cur.ops.push(`${pdfCor(o.fill)} rg ${r} f`);
+      if (o.stroke) cur.ops.push(`${pdfCor(o.stroke)} RG ${pdfN(o.lw || .6)} w ${r} S`);
+    },
+    linha(x1, y1, x2, y2, o = {}){
+      cur.ops.push(`${pdfCor(o.color || '#d3dde6')} RG ${pdfN(o.lw || .6)} w ${pdfN(x1)} ${pdfN(cur.h - y1)} m ${pdfN(x2)} ${pdfN(cur.h - y2)} l S`);
+    },
+    circulo(cx, cy, r, fill){
+      const k = .5523 * r, X = cx, Y = cur.h - cy, n = pdfN;
+      cur.ops.push(`${pdfCor(fill)} rg ${n(X+r)} ${n(Y)} m ${n(X+r)} ${n(Y+k)} ${n(X+k)} ${n(Y+r)} ${n(X)} ${n(Y+r)} c ${n(X-k)} ${n(Y+r)} ${n(X-r)} ${n(Y+k)} ${n(X-r)} ${n(Y)} c ${n(X-r)} ${n(Y-k)} ${n(X-k)} ${n(Y-r)} ${n(X)} ${n(Y-r)} c ${n(X+k)} ${n(Y-r)} ${n(X+r)} ${n(Y-k)} ${n(X+r)} ${n(Y)} c f`);
+    },
+    imagem(jpg, pw, ph, x, y, w, h){
+      const nome = 'Im' + (cur.imgs.length + 1); cur.imgs.push({nome, jpg, pw, ph});
+      cur.ops.push(`q ${pdfN(w)} 0 0 ${pdfN(h)} ${pdfN(x)} ${pdfN(cur.h - y - h)} cm /${nome} Do Q`);
+    },
+    /* quebra de linha por palavras (e por caractere quando uma palavra é maior que a linha) */
+    quebrar(str, maxW, size, bold){
+      const linhas = [];
+      for (const par of String(str ?? '').replace(/\r/g, '').split('\n')) {
+        let linha = '';
+        for (const pal of par.split(/ +/)) {
+          if (!pal && !linha) continue;
+          const t = linha ? linha + ' ' + pal : pal;
+          if (pdfLarg(t, size, bold) <= maxW) { linha = t; continue; }
+          if (linha) { linhas.push(linha); linha = ''; }
+          let resto = pal;
+          while (pdfLarg(resto, size, bold) > maxW) {
+            let k = resto.length; while (k > 1 && pdfLarg(resto.slice(0, k), size, bold) > maxW) k--;
+            linhas.push(resto.slice(0, k)); resto = resto.slice(k);
+          }
+          linha = resto;
+        }
+        linhas.push(linha);
+      }
+      return linhas;
+    },
+    ajustar(str, maxW, size, bold){
+      str = String(str ?? '');
+      if (pdfLarg(str, size, bold) <= maxW) return str;
+      let k = str.length; while (k > 1 && pdfLarg(str.slice(0, k) + '…', size, bold) > maxW) k--;
+      return str.slice(0, k) + '…';
+    },
+    finalizar(titulo){
+      const partes = [], off = []; let tam = 0;
+      const put = b => { const u = typeof b === 'string' ? pdfAscii(b) : b; partes.push(u); tam += u.length; };
+      const objs = [];
+      objs.push(['<< /Type /Catalog /Pages 2 0 R >>']);                                                        // 1
+      objs.push(null);                                                                                         // 2 (Pages, preenchido abaixo)
+      objs.push(['<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>']);        // 3  /F1
+      objs.push(['<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>']);   // 4  /F2
+      objs.push(['<< /Type /Font /Subtype /Type1 /BaseFont /Symbol >>']);                                      // 5  /F3
+      let tt = ''; for (let i = 0; i < titulo.length; i++) tt += titulo.charCodeAt(i).toString(16).padStart(4, '0');
+      objs.push([`<< /Title <FEFF${tt}> /Producer (Malha NBR 5101) /CreationDate (D:${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)}Z) >>`]); // 6
+      const kids = [];
+      for (const p of pags) {
+        const refs = p.imgs.map(im => {
+          objs.push([`<< /Type /XObject /Subtype /Image /Width ${im.pw} /Height ${im.ph} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.jpg.length} >>\nstream\n`, im.jpg, '\nendstream']);
+          return `/${im.nome} ${objs.length} 0 R`;
+        });
+        const cont = pdfAscii(p.ops.join('\n'));
+        objs.push([`<< /Length ${cont.length} >>\nstream\n`, cont, '\nendstream']);
+        const cn = objs.length;
+        objs.push([`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pdfN(p.w)} ${pdfN(p.h)}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> /XObject << ${refs.join(' ')} >> >> /Contents ${cn} 0 R >>`]);
+        kids.push(`${objs.length} 0 R`);
+      }
+      objs[1] = [`<< /Type /Pages /Kids [${kids.join(' ')}] /Count ${kids.length} >>`];
+      put(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x34, 0x0A, 0x25, 0xE2, 0xE3, 0xCF, 0xD3, 0x0A]));
+      objs.forEach((o, i) => { off.push(tam); put(`${i + 1} 0 obj\n`); o.forEach(put); put('\nendobj\n'); });
+      const xr = tam;
+      put(`xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + off.map(v => String(v).padStart(10, '0') + ' 00000 n \n').join(''));
+      put(`trailer\n<< /Size ${objs.length + 1} /Root 1 0 R /Info 6 0 R >>\nstartxref\n${xr}\n%%EOF\n`);
+      const out = new Uint8Array(tam); let q = 0; partes.forEach(u => { out.set(u, q); q += u.length; });
+      return out;
+    }
+  };
+}
+
+/* Nome do arquivo: "NOME DA VIA - NBR 5101.pdf" (só o nome do arquivo é sanitizado; o campo da via não muda) */
+function nomePDF(){
+  let v = String((state.cfg && state.cfg.via) || '') + (casoOn() ? ' (estudo de caso)' : '').replace(/[*?"<>\u0000-\u001f]+/g, '').replace(/\s*[\\/:|]+\s*/g, ' - ').replace(/\s+/g, ' ').trim();
+  v = v.replace(/^[\s-]+|[\s.-]+$/g, '').slice(0, 120).trim() || 'SEM NOME';
+  return `${v} - NBR 5101.pdf`;
+}
+
+/* Rasteriza a MESMA malha SVG exibida na tela (svgMalha) em alta resolução e devolve um JPEG */
+async function malhaJPEG(){
+  const {W, H, s} = svgMalha();
+  const tk = {};
+  TOKENS_LIGHT.split(';').forEach(t => { const i = t.indexOf(':'); if (i > 0) tk[t.slice(0, i).trim()] = t.slice(i + 1).trim(); });
+  const res = x => x.replace(/var\((--[\w-]+)\)/g, (m, n) => tk[n] || m);   // imagem SVG não herda as variáveis CSS da página
+  const k = Math.max(1.5, Math.min(3, 2400 / W, Math.sqrt(7e6 / (W * H))));
+  const cw = Math.round(W * k), ch = Math.round(H * k);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${cw}" height="${ch}" viewBox="0 0 ${W} ${H}"><style>${res(SVG_CSS)}</style><rect width="${W}" height="${H}" fill="#ffffff"/>${res(s)}</svg>`;
+  const img = new Image();
+  await new Promise((ok, erro) => { img.onload = ok; img.onerror = () => erro(new Error('falha ao desenhar a malha')); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+  const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+  const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cw, ch); g.drawImage(img, 0, 0, cw, ch);
+  const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.95));
+  if (!blob) throw new Error('falha ao capturar a malha');
+  return {W, H, px:[cw, ch], bytes:new Uint8Array(await blob.arrayBuffer())};
+}
+
+async function montarPDF(){
+  const c = cfgExp(), doc = criarPDF(), M = 40, K = PDF_COR;
+  const img = await malhaJPEG();
+  const ls = ladosDe(c.calc), areas = areasResumo(), emP = estimarPendentes(), areasE = state.estOn ? areasResumo(gEst(emP)) : [];
+  let y = 0;
+  const nova = paisagem => { doc.pagina(paisagem); y = 44; };
+  const ensure = h => { if (y + h > doc.ph - 48) nova(false); };
+  const secao = (n, t) => {
+    ensure(44); y += 10;
+    doc.texto(`${n}. ${t}`, M, y + 10, {size:11.5, bold:true, color:K.brand}); y += 16;
+    doc.linha(M, y, doc.pw - M, y, {color:K.line, lw:.8}); y += 8;
+  };
+  const kv = rows => {
+    const lw = 150, W = doc.pw - 2 * M, vw = W - lw - 14;
+    for (const [k, v] of rows) {
+      const L = doc.quebrar(v === '' || v == null ? '—' : v, vw, 9), h = L.length * 12 + 6;
+      ensure(h);
+      doc.retangulo(M, y, lw, h, {fill:K.cab}); doc.retangulo(M, y, W, h, {stroke:K.line}); doc.linha(M + lw, y, M + lw, y + h, {color:K.line});
+      doc.texto(k, M + 6, y + 12, {size:9, bold:true, color:K.muted});
+      L.forEach((ln, i) => doc.texto(ln, M + lw + 8, y + 12 + i * 12, {size:9}));
+      y += h;
+    }
+    y += 4;
+  };
+  const tabela = (cols, rows, o = {}) => {
+    const size = o.size || 8.5, rh = o.rh || 14, W = cols.reduce((a, k) => a + k.w, 0);
+    const cab = () => {
+      doc.retangulo(M, y, W, rh, {fill:K.cab, stroke:K.line});
+      let x = M;
+      cols.forEach(k => { doc.texto(doc.ajustar(k.t, k.w - 10, size, true), k.a === 'r' ? x + k.w - 5 : x + 5, y + rh - 4.2, {size, bold:true, color:K.muted, align:k.a === 'r' ? 'r' : 'l'}); x += k.w; });
+      y += rh;
+    };
+    ensure(rh * 2); cab();
+    rows.forEach((r, i) => {
+      if (y + rh > doc.ph - 48) { nova(false); cab(); }
+      if (i % 2) doc.retangulo(M, y, W, rh, {fill:K.zebra});
+      doc.linha(M, y + rh, M + W, y + rh, {color:K.line, lw:.4});
+      let x = M;
+      cols.forEach((k, j) => {
+        const cel = r[j], obj = cel !== null && typeof cel === 'object', t = obj ? cel.t : cel, b = !!(obj && cel.b);
+        doc.texto(doc.ajustar(t ?? '', k.w - 10, size, b), k.a === 'r' ? x + k.w - 5 : x + 5, y + rh - 4.2, {size, bold:b, color:(obj && cel.cor) || K.fg, align:k.a === 'r' ? 'r' : 'l'});
+        x += k.w;
+      });
+      y += rh;
+    });
+    y += 6;
+  };
+
+  /* título */
+  nova(false);
+  doc.texto('RELATÓRIO DE MEDIÇÃO – NBR 5101', M, y + 14, {size:17, bold:true, color:K.brand});
+  doc.texto(`NBR 5101:2024 · gerado em ${new Date().toLocaleString('pt-BR')}`, M, y + 29, {size:8.5, color:K.muted});
+  y += 38; doc.linha(M, y, doc.pw - M, y, {color:K.brand, lw:1.5}); y += 4;
+
+  /* 1. Identificação */
+  secao(1, 'Identificação');
+  kv([['Via do trecho', c.via], ['Município / local', c.municipio],
+      ['Data', c.data ? c.data.split('-').reverse().join('/') : ''], ['Responsável', c.resp], ['Instrumento (modelo / nº série)', c.luximetro],
+      ['Classe da via', `${c.classeC}${isM() ? ' (luminância, cd/m²)' : ' (iluminância, lx)'}`], ['Classe do passeio', ls.length ? c.classeP : 'Sem passeio'],
+      ['Pontos medidos', `${nMed()} de ${state.pontos.length}`]]);
+  if (casoOn()) { ensure(14); doc.texto('ESTUDO DE CASO — documento de exemplo com valores ilustrativos; não constitui levantamento de campo nem laudo.', M, y + 9, {size:8.5, bold:true, color:K.warn}); y += 16; }
+  if (state.estOn && emP.size) { for (const ln of doc.quebrar(metodoTxt(nMed(), state.pontos.length, emP.size), doc.pw - 2 * M, 8.5)) { ensure(12); doc.texto(ln, M, y + 9, {size:8.5, color:K.fg}); y += 12; } y += 4; }
+
+  /* 2. Características da instalação (S = valor já presente no registro/formulário) */
+  const N = calcN(c.S), D = c.S / N;
+  const posteOpt = [...$('postes').options].find(o => o.value === c.postes);
+  secao(2, 'Características da instalação');
+  kv([['Distância entre luminárias S (m)', fmt(c.S)], ['Divisões longitudinais', `N = ${N} · D = ${fmt(D)} m`],
+      ['Arranjo dos postes', posteOpt ? posteOpt.textContent : c.postes], ['Largura da faixa (m)', fmt(c.L)], ['Nº de faixas', String(c.faixas)],
+      ['Existência de passeio', LADO_TXT[c.calc] || c.calc], ...ls.map(l => [`Largura do passeio lado ${l} (m)`, fmt(c['Lc' + l])])]);
+
+  /* 3. Medições e resultados */
+  secao(3, 'Medições e resultados');
+  const v2 = (st, k, u) => st.n ? `${fmt(st[k])} ${u}` : '—';
+  tabela([{t:'Área', w:130}, {t:'Medidos', w:60, a:'r'}, {t:'Média', w:80, a:'r'}, {t:'Mínimo', w:75, a:'r'}, {t:'Máximo', w:75, a:'r'}, {t:'U0 (mín / média)', w:95, a:'r'}],
+    areas.map(a => [{t:a.titulo, b:true}, `${a.st.n}/${a.st.tot}`, v2(a.st, 'med', a.un), v2(a.st, 'min', a.un), v2(a.st, 'max', a.un), a.st.n ? fmt(a.st.u) : '—']));
+  ensure(34);
+  doc.texto('Registro dos pontos', M, y + 9, {size:9, bold:true, color:K.muted}); y += 12;
+  tabela([{t:'Nº', w:34}, {t:'Área', w:82}, {t:'Grupo', w:76}, {t:'Long. (m)', w:60, a:'r'}, {t:'Transv. (m)', w:62, a:'r'}, {t:'Valor', w:117, a:'r'}, {t:'Hora', w:50, a:'r'}, {t:'Foto', w:37, a:'r'}],
+    state.pontos.map(p => [{t:String(nro(p)), b:true}, areaNome(p), grupoNome(p), fmt(p.long), fmt(p.trans), p.lux == null ? (emP.has(p.id) ? fmtEst(p, emP.get(p.id)) + ' ' + unid(p) : '—') : fmtVal(p) + ' ' + unid(p), p.hora ? hhmm(p.hora) : '—', p.foto ? 'Sim' : '—']));
+
+  /* 4. Resumo de conformidade */
+  secao(4, 'Resumo de conformidade');
+  const corLinha = {p:K.ok, f:K.bad, i:K.muted, '':K.muted};
+  for (const a of areas) {
+    const s = statusArea(a.st, a.linhas), [fg, bg] = PDF_PILL[s.cls];
+    ensure(24 + 14 * (a.linhas.length + 1) + 10);
+    doc.texto(a.titulo, M, y + 12, {size:10.5, bold:true});
+    const tw = pdfLarg(s.txt, 8.5, true) + 16;
+    doc.retangulo(doc.pw - M - tw, y + 1, tw, 15, {fill:bg});
+    doc.texto(s.txt, doc.pw - M - tw / 2, y + 11.5, {size:8.5, bold:true, color:fg, align:'c'});
+    y += 22;
+    tabela([{t:'Parâmetro', w:110}, {t:'Resultado', w:130, a:'r'}, {t:'Requisito', w:100, a:'r'}, {t:'Situação', w:175}],
+      a.linhas.map(l => { const t = linhaTxt(l, a.st); return [{t:l.k, b:true}, {t:t.v, cor:corLinha[t.cls]}, l.r, {t:t.sit, cor:t.sit === 'Verificação complementar' ? K.warn : corLinha[t.cls], b:true}]; }));
+    const ae = areasE[areas.indexOf(a)];
+    if (ae && ae.st.n > a.st.n) {
+      const le = ae.linhas.filter(l => !l.comp && l.v);
+      ensure(14 + 14 * (le.length + 1));
+      doc.texto(`Com estimativa · ${ae.st.n}/${ae.st.tot} pontos (${ae.st.n - a.st.n} estimados)`, M, y + 9, {size:8.5, bold:true, color:K.warn}); y += 13;
+      tabela([{t:'Parâmetro', w:110}, {t:'Resultado', w:130, a:'r'}, {t:'Requisito', w:100, a:'r'}, {t:'Situação', w:175}],
+        le.map(l => [{t:l.k, b:true}, {t:l.v, cor:K.muted}, l.r, {t:'Estimado (não é medição)', cor:K.warn}]));
+    }
+  }
+  if (!ls.length) { ensure(14); doc.texto('Passeios: não existem neste trecho; apenas a via é avaliada.', M, y + 9, {size:8.5, color:K.muted}); y += 14; }
+  for (const ln of doc.quebrar(notaResumo(), doc.pw - 2 * M, 8)) { ensure(11); doc.texto(ln, M, y + 8, {size:8, color:K.muted}); y += 11; }
+
+  /* 5. Malha gráfica: página própria, em paisagem ou retrato conforme o formato que dê o maior desenho */
+  const aw = [841.89 - 2 * M, 595.28 - 2 * M], ah = [595.28 - 44 - 48 - 80, 841.89 - 44 - 48 - 80];
+  const sL = Math.min(aw[0] / img.W, ah[0] / img.H), sP = Math.min(aw[1] / img.W, ah[1] / img.H);
+  nova(sL >= sP);
+  secao(5, 'Malha gráfica');
+  doc.texto(`Via ${c.classeC}${ls.length ? ' · Passeio ' + c.classeP : ''} · ${state.pontos.length} pontos (${nMed()} medidos) · S = ${fmt(c.S)} m`, M, y + 8, {size:8.5, color:K.muted}); y += 14;
+  const sc = Math.max(sL, sP), iw = img.W * sc, ih = img.H * sc, ix = M + ((doc.pw - 2 * M) - iw) / 2;
+  doc.imagem(img.bytes, img.px[0], img.px[1], ix, y, iw, ih);
+  doc.retangulo(ix, y, iw, ih, {stroke:K.line});
+  y += ih + 8;
+  ensure(18);
+  let lx = M;
+  const leg = (cor, txt) => { doc.circulo(lx + 4, y + 5, 4, cor); doc.texto(txt, lx + 12, y + 8, {size:8.5, color:K.muted}); lx += 12 + pdfLarg(txt, 8.5) + 14; };
+  leg(K.via, `Via ${c.classeC}`); if (ls.length) leg(K.ped, `Passeio ${c.classeP}`); leg(K.ok, 'Medido (valor acima do ponto)');
+  doc.texto('A numeração dos pontos é a mesma da tabela do item 3.', doc.pw - M, y + 8, {size:8.5, color:K.muted, align:'r'});
+  y += 16;
+
+  /* 6. Observações */
+  const obs = (c.obs || '').trim();
+  let L = obs ? doc.quebrar(obs, doc.pw - 2 * M, 9.5) : [];
+  if (doc.pw > doc.ph && y + 44 + L.length * 13 > doc.ph - 48) { nova(false); L = obs ? doc.quebrar(obs, doc.pw - 2 * M, 9.5) : []; }
+  secao(6, 'Observações');
+  if (!obs) { doc.texto('Nenhuma observação registrada.', M, y + 9, {size:9.5, color:K.muted}); y += 14; }
+  else for (const ln of L) { ensure(13); doc.texto(ln, M, y + 9.5, {size:9.5}); y += 13; }
+
+  /* rodapé em todas as páginas */
+  const n = doc.n;
+  for (let i = 0; i < n; i++) {
+    doc.usar(i);
+    doc.linha(M, doc.ph - 34, doc.pw - M, doc.ph - 34, {color:K.line, lw:.6});
+    doc.texto(doc.ajustar(`NBR 5101 · ${c.municipio ? c.municipio + ' · ' : ''}${c.via || 'Sem nome'}`, doc.pw - 2 * M - 80, 8), M, doc.ph - 22, {size:8, color:K.muted});
+    doc.texto(`Página ${i + 1} de ${n}`, doc.pw - M, doc.ph - 22, {size:8, color:K.muted, align:'r'});
+  }
+  return doc.finalizar(`Relatório de medição NBR 5101 – ${c.via || 'sem nome'}`);
+}
+
+async function exportarPDF(){
+  if (!state.cfg) { toast('Nenhum levantamento aberto.'); return; }
+  const btn = $('btnPdf'), t0 = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Gerando PDF…';
+  try {
+    const nome = nomePDF();
+    baixar(new Blob([await montarPDF()], {type:'application/pdf'}), nome);
+    toast(`PDF salvo: ${nome}`, 4000);
+  } catch(e) {
+    toast('Não foi possível gerar o PDF: ' + (e && e.message ? e.message : e), 7000);
+  } finally { btn.disabled = false; btn.textContent = t0; }
+}
+
+/* ---------- Eventos ---------- */
+$('btnGerar').onclick = () => gerar(false);
+$('btnNovo').onclick = async () => {
+  await gerar(true);
+  $('via').focus(); $('via').select();
+  toast('Novo levantamento criado. Escolha a via no banco de dados ou ajuste os campos e toque em “Gerar malha”.', 4000);
+};
+
+$('btnEst').onclick = async () => {
+  if (!state.cfg) return;
+  if (!state.estOn) {
+    if (!(await confirmar('Os pontos pendentes serão preenchidos por estimativa (interpolação dos vizinhos medidos). Nos registros, nos relatórios e na malha eles aparecem como os demais valores, sem marca individual; o relatório informa na metodologia quantos pontos foram interpolados. Eles não mudam os ícones da malha nem a situação de conformidade (só pontos medidos contam) e não são medições da NBR 5101.', 'Completar por estimativa'))) return;
+    state.estOn = true;
+  } else state.estOn = false;
+  renderTudo(); await salvar(); renderLevs();
+};
+
+/* ---------- Importar folha de campo ----------
+   Fluxo: colar a transcrição da folha (ou lista "ponto = valor") -> mapear os blocos da folha para os grupos da malha ->
+   conferir (células editáveis, alertas de dúvida, discrepância e substituição) -> gravar. As leituras gravadas ficam com
+   p.imp = true (origem "folha de campo"), saem identificadas no CSV e uma linha nas observações dos relatórios. */
+document.head.insertAdjacentHTML('beforeend', `<style>
+#imp{align-items:center}.imp-cols{display:grid;grid-template-columns:1fr;gap:12px}@media(min-width:820px){.imp-cols{grid-template-columns:1fr 1fr}}
+#impTxt{width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.82rem;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}
+#impImgWrap{overflow:auto;max-height:260px;border:1px solid var(--line);border-radius:8px;margin-top:8px;background:var(--surface-2)}#impImg{display:block;width:100%;transform-origin:top left}
+.gi{border-collapse:collapse;font-size:.78rem;margin:4px 0}.gi th{font-weight:700;color:var(--muted);padding:2px 6px;border:1px solid var(--line);background:var(--surface-2)}.gi td{border:1px solid var(--line);padding:0}
+.gi input{width:4.7em;border:0;padding:5px 4px;text-align:right;font-family:ui-monospace,Menlo,Consolas,monospace;background:transparent;color:inherit}
+.gi input[type=checkbox]{width:auto;padding:0;margin-right:6px}.gi select{max-width:100%}
+.gi td.dub{background:rgba(255,193,7,.28)}.gi td.out{background:rgba(220,53,69,.25)}.gi td.ex{background:rgba(23,105,170,.22)}.gi td.bad{background:rgba(220,53,69,.5)}
+.impleg span{display:inline-block;padding:1px 8px;border-radius:4px;margin-right:6px;font-size:.74rem}
+</style>`);
+const FICHA_BLOCOS = [
+  {k:'c1', nome:'Calçada 1', ln:[1,2,3]}, {k:'a1', nome:'Pista A – faixa 1', ln:[5,6,7]}, {k:'a2', nome:'Pista A – faixa 2', ln:[8,9,10]},
+  {k:'cc', nome:'Canteiro central (pedestres)', ln:[11,12,13]}, {k:'b3', nome:'Pista B – faixa 3', ln:[15,16,17]},
+  {k:'b4', nome:'Pista B – faixa 4', ln:[18,19,20]}, {k:'c2', nome:'Calçada 2', ln:[21,22,23]}];
+const FICHA_LINHAS = FICHA_BLOCOS.flatMap(b => b.ln);   // L4, L14 e L24 (extra > 4,5 m) não entram
+const numFicha = t => parseFloat(String(t).replace(',', '.'));
+function parseCel(t){
+  t = String(t).trim();
+  if (/^(-|—|–|x|X|\.{1,3})?$/.test(t)) return {v:null};
+  const m = t.match(/^(\d+(?:[.,]\d+)?)(\?)?$/);
+  return m ? {v:numFicha(m[1]), dub:!!m[2]} : {v:null, bad:t};
+}
+function parseFolha(txt){
+  const matriz = new Map(), lista = new Map(), avisos = []; let seq = 0;
+  for (const raw of String(txt).split(/\r?\n/)) {
+    const l = raw.replace(/[`*|]/g, ' ').replace(/\s+/g, ' ').trim(); if (!l) continue;
+    const ml = l.match(/^[Pp]?(\d{1,4})\s*[=:]\s*(\d+(?:[.,]\d+)?)\s*(\?)?$/);
+    if (ml) { lista.set(parseInt(ml[1], 10), {v:numFicha(ml[2]), dub:!!ml[3]}); continue; }
+    const tk = l.replace(/[;\t]/g, ' ').split(/\s+/), mm = tk[0].match(/^[Ll](\d{1,2})[:.)]?$/);
+    if (!mm && tk.some(t => !/^(\d+(?:[.,]\d+)?\??|-|—|–|x|X)$/.test(t))) continue;   // comentário/cabeçalho da resposta do chat
+    let ln;
+    if (mm) { ln = parseInt(mm[1], 10); tk.shift(); const ix = FICHA_LINHAS.indexOf(ln); if (ix >= 0) seq = ix + 1; }
+    else ln = FICHA_LINHAS[seq++];
+    if (ln == null) { avisos.push(`Linha sem correspondência na folha: “${l.slice(0, 28)}”.`); continue; }
+    if (!FICHA_LINHAS.includes(ln)) { avisos.push(`L${ln} é linha extra (> 4,5 m) e foi ignorada.`); continue; }
+    matriz.set(ln, tk.map(t => ({txt:t, ...parseCel(t)})));
+  }
+  return {matriz, lista, avisos};
+}
+function gruposApp(){
+  const m = new Map();
+  state.pontos.forEach(p => { const k = p.kind + p.g; if (!m.has(k)) m.set(k, {k, nome:grupoNome(p), pts:[]}); m.get(k).pts.push(p); });
+  return [...m.values()].map(g => {
+    g.lo = [...new Set(g.pts.map(p => Math.round(p.long * 1e6)))].sort((a, b) => a - b);
+    g.tr = [...new Set(g.pts.map(p => Math.round(p.trans * 1e6)))].sort((a, b) => a - b);
+    return g;
+  });
+}
+const IMP = {parsed:null, map:{}, inv:{}, edits:{}, modelo:null};
+const impTemDados = (b, P) => b.ln.some(l => (P.matriz.get(l) || []).some(c => c.v != null || c.bad));
+function impDestPadrao(P, gr){
+  const has = k => gr.some(g => g.k === k), d = {};
+  FICHA_BLOCOS.forEach(b => d[b.k] = '');
+  d.c1 = has('p1') ? 'p1' : ''; ['a1','a2','b3','b4'].forEach((k, i) => d[k] = has('via' + (i + 1)) ? 'via' + (i + 1) : '');
+  if (has('p2')) { if (impTemDados(FICHA_BLOCOS[3], P)) d.cc = 'p2'; else if (impTemDados(FICHA_BLOCOS[6], P)) d.c2 = 'p2'; }
+  return d;
+}
+function impConstruir(){
+  const P = IMP.parsed, gr = gruposApp(), blocos = [];
+  for (const b of FICHA_BLOCOS) {
+    if (!impTemDados(b, P)) continue;
+    const dk = IMP.map[b.k], g = gr.find(x => x.k === dk);
+    const bl = {b, g, erro:'', rows:[], inv:!!IMP.inv[b.k]};
+    if (!g) bl.erro = 'Sem destino: este bloco não será importado.';
+    else if (g.tr.length !== 3) bl.erro = `O grupo ${g.nome} tem ${g.tr.length} pontos transversais e a folha traz 3 linhas por bloco.`;
+    if (!bl.erro) {
+      const N = g.lo.length;
+      b.ln.forEach((ln, r) => {
+        const row = (P.matriz.get(ln) || []).map((c, i) => {
+          const key = ln + ':' + i; if (key in IMP.edits) { const t = IMP.edits[key]; return {txt:t, ...parseCel(t)}; }
+          return {...c};
+        });
+        while (row.length < N) row.push({txt:'', v:null});
+        const j = bl.inv ? 2 - r : r;
+        row.forEach((c, i) => { c.ln = ln; c.i = i; c.pt = i < N ? g.pts.find(p => Math.round(p.long * 1e6) === g.lo[i] && Math.round(p.trans * 1e6) === g.tr[j]) : null; });
+        bl.rows.push(row);
+      });
+      // alertas: discrepância frente aos vizinhos ortogonais do bloco
+      bl.rows.forEach((row, r) => row.forEach((c, i) => {
+        if (c.v == null) return;
+        const nb = [bl.rows[r][i-1], bl.rows[r][i+1], (bl.rows[r-1]||[])[i], (bl.rows[r+1]||[])[i]].filter(x => x && x.v != null).map(x => x.v).sort((a, b) => a - b);
+        if (nb.length >= 2) { const med = nb.length % 2 ? nb[(nb.length-1)/2] : (nb[nb.length/2-1] + nb[nb.length/2]) / 2; if (c.v > 1.7 * med || c.v < 0.55 * med) c.out = true; }
+        if (!c.pt) c.semPonto = true;
+        else if (c.pt.lux != null && Math.abs(c.pt.lux - c.v) > 1e-9) c.ex = true;
+      }));
+    }
+    blocos.push(bl);
+  }
+  const lista = [...P.lista].map(([n, o]) => { const pt = state.pontos.find(p => nro(p) === n); return {n, ...o, pt, ex:!!(pt && pt.lux != null && Math.abs(pt.lux - o.v) > 1e-9)}; });
+  return {blocos, lista};
+}
+function impRender(){
+  const P = IMP.parsed, gr = gruposApp(); if (!P) return;
+  const dados = FICHA_BLOCOS.filter(b => impTemDados(b, P));
+  let h = P.avisos.length ? `<p class="note" style="color:var(--warn)">${P.avisos.map(esc).join('<br>')}</p>` : '';
+  if (dados.length) {
+    h += '<table class="gi"><tr><th>Bloco da folha</th><th>Destino na malha</th><th>Ordem</th></tr>' + dados.map(b =>
+      `<tr><td style="padding:3px 8px">${b.nome} (L${b.ln[0]}–L${b.ln[2]})</td><td><select data-dest="${b.k}"><option value="">(não importar)</option>${gr.map(g => `<option value="${g.k}"${IMP.map[b.k] === g.k ? ' selected' : ''}>${g.nome}</option>`).join('')}</select></td>` +
+      `<td style="padding:3px 8px"><label><input type="checkbox" data-inv="${b.k}"${IMP.inv[b.k] ? ' checked' : ''}> inverter linhas</label></td></tr>`).join('') + '</table>';
+    const dup = {}; dados.forEach(b => { const d = IMP.map[b.k]; if (d) dup[d] = (dup[d] || 0) + 1; });
+    IMP.dupDest = Object.values(dup).some(n => n > 1);
+    if (IMP.dupDest) h += '<p class="note" style="color:var(--bad)">Dois blocos da folha apontam para o mesmo grupo da malha. Escolha destinos diferentes.</p>';
+  } else IMP.dupDest = false;
+  $('impMap').innerHTML = h;
+  const M = impConstruir(); IMP.modelo = M;
+  let c = '', nGrav = 0, nDub = 0, nOut = 0, nEx = 0, nBad = 0, nSem = 0;
+  for (const bl of M.blocos) {
+    c += `<div style="margin-top:10px"><b>${bl.b.nome}</b> → ${bl.g ? bl.g.nome : '—'}</div>`;
+    if (bl.erro) { c += `<p class="note" style="color:var(--warn)">${bl.erro}</p>`; continue; }
+    c += '<div style="overflow-x:auto"><table class="gi"><tr><th></th>' + bl.rows[0].map((_, i) => `<th>P${i + 1}</th>`).join('') + '</tr>' +
+      bl.rows.map((row, r) => `<tr><th>L${bl.b.ln[r]}</th>` + row.map(cel => {
+        const cl = [cel.bad ? 'bad' : '', cel.semPonto ? 'bad' : '', cel.dub ? 'dub' : '', cel.out ? 'out' : '', cel.ex ? 'ex' : ''].filter(Boolean).join(' ');
+        if (cel.v != null && cel.pt) nGrav++; if (cel.v != null && cel.dub) nDub++; if (cel.out) nOut++; if (cel.ex) nEx++; if (cel.bad) nBad++; if (cel.semPonto && cel.v != null) nSem++;
+        const tt = cel.ex ? `Já existe leitura: ${fmt(cel.pt.lux, 1)}` : cel.out ? 'Destoa dos vizinhos: confira na folha' : cel.dub ? 'Marcado como duvidoso' : cel.bad ? 'Valor não numérico' : cel.semPonto ? 'Sem ponto correspondente na malha' : '';
+        return `<td class="${cl}" title="${tt}"><input data-cel="${cel.ln}:${cel.i}" value="${esc(cel.txt ?? '')}" inputmode="decimal" aria-label="L${cel.ln} P${cel.i + 1}"></td>`;
+      }).join('') + '</tr>').join('') + '</table></div>';
+  }
+  if (M.lista.length) {
+    c += '<div style="margin-top:10px"><b>Lista por número do ponto</b></div><table class="gi"><tr><th>Ponto</th><th>Valor</th><th>Situação</th></tr>' + M.lista.map(o => {
+      if (o.pt) nGrav++; else nSem++; if (o.dub) nDub++; if (o.ex) nEx++;
+      return `<tr><td style="padding:3px 8px">${o.n}</td><td style="padding:3px 8px;text-align:right">${fmt(o.v, 1)}${o.dub ? ' ?' : ''}</td><td style="padding:3px 8px">${!o.pt ? 'ponto inexistente' : o.ex ? 'substitui ' + fmt(o.pt.lux, 1) : 'novo'}</td></tr>`;
+    }).join('') + '</table>';
+  }
+  c += `<p class="impleg note"><span style="background:rgba(255,193,7,.28)">duvidoso (?)</span><span style="background:rgba(220,53,69,.25)">destoa dos vizinhos</span><span style="background:rgba(23,105,170,.22)">já existe leitura</span><span style="background:rgba(220,53,69,.5)">erro</span></p>`;
+  $('impConf').innerHTML = c;
+  IMP.cont = {nGrav, nDub, nOut, nEx, nBad, nSem};
+  $('impResumo').textContent = `${nGrav} leitura(s) a gravar · ${nDub} duvidosa(s) · ${nOut} destoando · ${nEx} substituindo${nBad + nSem ? ` · ${nBad + nSem} com erro (corrija ou apague a célula)` : ''}`;
+  $('impAplicar').disabled = !nGrav || !!(nBad + nSem) || IMP.dupDest;
+}
+function impAbrir(){
+  if (!state.cfg || !state.pontos.length) return;
+  IMP.parsed = null; IMP.edits = {}; $('impMap').innerHTML = ''; $('impConf').innerHTML = ''; $('impResumo').textContent = ''; $('impAplicar').disabled = true;
+  $('imp').hidden = false; impIACarregar();
+}
+$('btnImp').onclick = impAbrir;
+$('impFechar').onclick = () => { $('imp').hidden = true; };
+$('impConferir').onclick = () => {
+  IMP.parsed = parseFolha($('impTxt').value); IMP.edits = {};
+  if (!IMP.parsed.matriz.size && !IMP.parsed.lista.size) { toast('Nada reconhecido: use linhas “L1 52,7 46,8 …” ou “12 = 34,5”.'); return; }
+  IMP.map = impDestPadrao(IMP.parsed, gruposApp()); IMP.inv = {}; impRender();
+};
+$('impMap').addEventListener('change', e => {
+  if (e.target.dataset.dest !== undefined) IMP.map[e.target.dataset.dest] = e.target.value;
+  if (e.target.dataset.inv !== undefined) IMP.inv[e.target.dataset.inv] = e.target.checked;
+  impRender();
+});
+$('impConf').addEventListener('change', e => { if (e.target.dataset.cel) { IMP.edits[e.target.dataset.cel] = e.target.value; impRender(); } });
+$('impAplicar').onclick = async () => {
+  const M = IMP.modelo, subst = $('impSubst').checked; let gr = 0, pul = 0;
+  const grava = (p, v) => { if (p.lux != null && Math.abs(p.lux - v) > 1e-9 && !subst) { pul++; return; } p.lux = Math.round(v * 1000) / 1000; p.imp = true; delete p.auto; gr++; };
+  for (const bl of M.blocos) if (!bl.erro) bl.rows.forEach(row => row.forEach(c => { if (c.v != null && c.pt) grava(c.pt, c.v); }));
+  M.lista.forEach(o => { if (o.pt) grava(o.pt, o.v); });
+  $('imp').hidden = true; renderTudo(); await salvar(); renderLevs();
+  toast(`${gr} leitura(s) gravada(s)${pul ? ` · ${pul} mantida(s) (já existiam)` : ''}.`);
+};
+/* foto da folha: só para conferência visual (não é gravada no levantamento) */
+let impRot = 0, impZoom = 100;
+const impImgAplicar = () => { const im = $('impImg'); im.style.width = impZoom + '%'; im.style.transform = `rotate(${impRot}deg)`; im.style.transformOrigin = 'center'; $('impImgWrap').style.minHeight = impRot % 180 ? (im.clientWidth || 300) + 'px' : ''; };
+$('impFoto').onchange = e => { const f = e.target.files && e.target.files[0]; if (!f) return; $('impImg').src = URL.createObjectURL(f); $('impImgBox').hidden = false; impRot = 0; impZoom = 100; impImgAplicar(); };
+$('impGirar').onclick = () => { impRot = (impRot + 90) % 360; impImgAplicar(); };
+$('impMais').onclick = () => { impZoom = Math.min(400, impZoom + 25); impImgAplicar(); };
+$('impMenos').onclick = () => { impZoom = Math.max(50, impZoom - 25); impImgAplicar(); };
+
+/* ---------- Leitura automática da foto (API da Anthropic, chamada direta do navegador) ---------- */
+const IA_PROMPT = 'Esta é a foto de uma folha de campo de medição de iluminância (NBR 5101), possivelmente girada: leia na orientação correta. A seção “5. LEITURAS (lx)” é uma tabela com linhas L1…L24 (blocos de 3 linhas por faixa ou calçada; L4, L14 e L24 são linhas “extra”, normalmente vazias) e colunas P1…P12 (postes). Os valores estão escritos à mão. Transcreva SOMENTE a tabela de leituras, uma linha por linha preenchida, no formato `L<número> v1 v2 … vN`, com os valores dos postes na ordem P1, P2, … e vírgula decimal exatamente como escrita. Se um dígito estiver duvidoso (letra ruim, sobreposição, rasura), escreva o valor mais provável seguido de `?` (ex.: 14,8?). Use `-` para célula vazia. Não invente valores para linhas vazias e não corrija valores que pareçam estranhos: transcreva o que está escrito. Ignore o cabeçalho e as observações. Responda apenas com as linhas, sem comentários nem markdown.';
+const LS_KEY = 'malhaNBR5101_apikey', LS_MOD = 'malhaNBR5101_modelo';
+function impIACarregar(){
+  try { $('impKey').value = localStorage.getItem(LS_KEY) || ''; $('impLembrar').checked = !!$('impKey').value; const m = localStorage.getItem(LS_MOD); if (m) $('impModelo').value = m; } catch (e) {}
+  $('impIAst').textContent = '';
+}
+async function impImagemBase64(){
+  const im = $('impImg');
+  if (!im.getAttribute('src')) throw new Error('Anexe a foto da folha antes.');
+  try { await im.decode(); } catch (e) {}
+  const rot = impRot % 360, w0 = im.naturalWidth, h0 = im.naturalHeight, k = Math.min(1, 1600 / Math.max(w0, h0));
+  const cw = Math.round((rot % 180 ? h0 : w0) * k), ch = Math.round((rot % 180 ? w0 : h0) * k);
+  const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cw, ch);
+  g.translate(cw / 2, ch / 2); g.rotate(rot * Math.PI / 180); g.drawImage(im, -w0 * k / 2, -h0 * k / 2, w0 * k, h0 * k);
+  return c.toDataURL('image/jpeg', 0.92).split(',')[1];
+}
+$('impPrompt').value = IA_PROMPT;
+$('impCopiar').onclick = async () => {
+  const st = $('impCopiarSt'), ta = $('impPrompt');
+  try { await navigator.clipboard.writeText(IA_PROMPT); st.textContent = 'Instruções copiadas.'; }
+  catch (e) { ta.focus(); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e2) {} st.textContent = ok ? 'Instruções copiadas.' : 'Selecione o texto acima e copie (Ctrl+C).'; }
+};
+$('impLer').onclick = async () => {
+  const key = $('impKey').value.trim(), modelo = $('impModelo').value.trim() || 'claude-sonnet-5-5', st = $('impIAst'), btn = $('impLer');
+  if (!key) { st.textContent = 'Informe a chave de API.'; return; }
+  try {
+    st.textContent = 'Preparando a imagem…'; const data = await impImagemBase64();
+    try { if ($('impLembrar').checked) { localStorage.setItem(LS_KEY, key); localStorage.setItem(LS_MOD, modelo); } else localStorage.removeItem(LS_KEY); } catch (e) {}
+    btn.disabled = true; st.textContent = 'Lendo a foto… (pode levar cerca de 1 minuto)';
+    const ctrl = new AbortController(), to = setTimeout(() => ctrl.abort(), 150000);
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST', signal:ctrl.signal,
+      headers:{'content-type':'application/json', 'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:modelo, max_tokens:4000, messages:[{role:'user', content:[{type:'image', source:{type:'base64', media_type:'image/jpeg', data}}, {type:'text', text:IA_PROMPT}]}]})});
+    clearTimeout(to);
+    const j = await r.json().catch(() => null);
+    if (!r.ok) throw new Error((j && j.error && j.error.message) || ('HTTP ' + r.status));
+    const txt = ((j && j.content) || []).filter(x => x.type === 'text').map(x => x.text).join('\n');
+    const linhas = txt.split(/\r?\n/).map(l => l.replace(/[`*]/g, '').trim()).filter(l => /^[Ll]\d{1,2}\b/.test(l));
+    if (!linhas.length) throw new Error('a resposta não trouxe linhas “L1 …”. Tente de novo ou cole as leituras manualmente');
+    $('impTxt').value = linhas.join('\n');
+    st.textContent = `${linhas.length} linha(s) lida(s). Confira cada valor abaixo antes de gravar.`;
+    $('impConferir').click();
+  } catch (e) {
+    const m = String((e && e.message) || e);
+    st.textContent = e && e.name === 'AbortError' ? 'Tempo esgotado. Tente de novo.' : 'Falha na leitura: ' + m + (/Failed to fetch|NetworkError|Load failed/i.test(m) ? ' — sem internet ou bloqueio do navegador; cole as leituras manualmente.' : '');
+  } finally { btn.disabled = false; }
+};
+
+/* ---------- Leitura automática do luxímetro (OCR local de visor de 7 segmentos) ----------
+   Tudo roda no aparelho: não há biblioteca externa nem envio de imagem. Fluxo: câmera -> região marcada -> binarização local
+   -> escolha da linha principal (a de dígitos mais altos; ignora temperatura, HOLD, unidade) -> separação dos dígitos e do
+   ponto decimal -> leitura dos 7 segmentos de cada dígito. Qualquer dúvida (ambíguo, padrão inválido, fora de 0–200.000)
+   rejeita o quadro: o sistema nunca completa nem estima dígitos. Estável = N reconhecimentos consecutivos consistentes. */
+document.head.insertAdjacentHTML('beforeend', `<style>
+.btn.big{min-height:52px;font-size:1.02rem;padding:12px 18px}
+.la-box{margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:12px}.la-box h3{margin:0 0 6px;font-size:1rem}
+.la-stage{position:relative;line-height:0;border-radius:10px;overflow:hidden;background:#000}.la-stage video{width:100%;height:auto;display:block}
+.la-stage img{width:100%;height:auto;display:block}.la-stage canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair}
+.la-rec{position:absolute;top:8px;left:8px;background:rgba(198,47,47,.92);color:#fff;font:700 12px system-ui;padding:3px 8px;border-radius:12px;line-height:1.4}
+.la-mult{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:8px 0}.la-mult label{font-weight:700;font-size:.85rem}.la-mult select{padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}.la-read{margin:8px 0}.la-val{font:800 2.2rem/1.1 var(--f-num, ui-monospace, monospace)}
+.la-bar{height:8px;background:var(--surface-2);border-radius:6px;overflow:hidden;margin:6px 0}.la-bar i{display:block;height:100%;width:0;background:var(--ok);transition:width .15s}
+.la-aj summary{cursor:pointer;margin:8px 0}.la-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.la-grid label{display:flex;flex-direction:column;font-size:.8rem;gap:3px}
+.la-grid select,.la-grid input{padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}
+#laPrev{width:100%;height:auto;border:1px solid var(--line);border-radius:6px;margin-top:8px;image-rendering:pixelated;background:#fff}
+</style>`);
+const LA_KEY = 'malhaNBR5101_luxcal';
+const LA = {focoMin:.2, cal:{roi:{x:.15, y:.25, w:.70, h:.45}, shear:'auto', pol:'auto', tol:0, cons:3, mult:1}, ctx:null, ref:null, cnt:0, ultimo:null, timer:null, busy:false, best:null, drag:null, conf:null, cv:null, stable:false};
+(function laCarregar(){ try { const o = JSON.parse(localStorage.getItem(LA_KEY) || 'null'); if (o && o.roi) LA.cal = {...LA.cal, ...o}; } catch (e) {} })();
+const laSalvarCal = () => { try { localStorage.setItem(LA_KEY, JSON.stringify(LA.cal)); } catch (e) {} };
+const LA_PAT = {'1111110':'0','0110000':'1','1101101':'2','1111001':'3','0110011':'4','1011011':'5','1011111':'6','0011111':'6','1110000':'7','1110010':'7','1111111':'8','1111011':'9','1110011':'9'};
+const LA_SEG = {a:[.22,.78,0,.11], b:[.76,1,.10,.46], c:[.76,1,.54,.90], d:[.22,.78,.89,1], e:[0,.24,.54,.90], f:[0,.24,.10,.46], g:[.22,.78,.43,.57]};   // caixas rentes à espessura das barras: ligado ≈ .65–.9, desligado ≈ 0
+const LA_MSG = {
+  desfoque:'Imagem desfocada: aguarde o foco da câmera ou ajuste a distância do visor.',
+  contraste:'Pouca luz ou baixo contraste: aproxime o aparelho ou melhore a iluminação do visor.',
+  digitos:'Nenhum dígito encontrado: enquadre a linha principal do visor, por dentro da moldura.',
+  ambiguo:'Leitura ambígua (desfoque, reflexo ou ruído): estabilize a câmera e evite reflexos.',
+  colados:'Dígitos não separados: enquadre só a linha do lux e ajuste a inclinação.',
+  espaco:'Há um espaço no meio dos dígitos: confira o enquadramento.',
+  padrao:'Dígito não reconhecido: ajuste a região, o ângulo ou a distância.',
+  ponto:'Ponto decimal em posição inválida: confira o enquadramento.',
+  faixa:'Valor fora da faixa de 0 a 200.000 lx: leitura rejeitada.',
+  regiao:'Região muito pequena: marque o visor arrastando sobre a imagem.',
+  cortado:'Um dígito encosta na borda da região marcada: aumente um pouco a região em volta dos números.'};
+function laPercentis(gray){
+  const h = new Uint32Array(256); for (let i = 0; i < gray.length; i++) h[gray[i] | 0]++;
+  const n = gray.length; let a = 0, lo = 0, hi = 255;
+  for (let i = 0; i < 256; i++) { a += h[i]; if (a >= n * .01) { lo = i; break; } }
+  a = 0; for (let i = 255; i >= 0; i--) { a += h[i]; if (a >= n * .01) { hi = i; break; } }
+  return [lo, hi];
+}
+function laNitidez(gray, W, H, rng){
+  let s = 0, s2 = 0, n = 0;
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) { const i = y*W + x, l = 4*gray[i] - gray[i-1] - gray[i+1] - gray[i-W] - gray[i+W]; s += l; s2 += l*l; n++; }
+  const m = s / n; return (s2 / n - m*m) / (rng * rng);
+}
+function laBinarizar(gray, W, H, pol, rng, kd){
+  const W1 = W + 1, I = new Float64Array(W1 * (H + 1));
+  for (let y = 0; y < H; y++) { let row = 0; for (let x = 0; x < W; x++) { row += gray[y*W + x]; I[(y+1)*W1 + x + 1] = I[y*W1 + x + 1] + row; } }
+  const r = Math.max(6, Math.round(H * .30)), d = (kd || .12) * rng, bin = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) { const y0 = Math.max(0, y - r), y1 = Math.min(H, y + r + 1);
+    for (let x = 0; x < W; x++) { const x0 = Math.max(0, x - r), x1 = Math.min(W, x + r + 1);
+      const mean = (I[y1*W1 + x1] - I[y0*W1 + x1] - I[y1*W1 + x0] + I[y0*W1 + x0]) / ((x1 - x0) * (y1 - y0)), v = gray[y*W + x];
+      bin[y*W + x] = (pol === 'dark' ? v < mean - d : v > mean + d) ? 1 : 0; } }
+  return bin;
+}
+function laLimpar(bin, W, H, minA){
+  const vis = new Uint8Array(W * H), st = [];
+  for (let i = 0; i < bin.length; i++) {
+    if (!bin[i] || vis[i]) continue;
+    const comp = []; let mnx = W, mxx = 0, mny = H, mxy = 0; st.push(i); vis[i] = 1;
+    while (st.length) { const p = st.pop(); comp.push(p); const x = p % W, y = (p / W) | 0; if (x < mnx) mnx = x; if (x > mxx) mxx = x; if (y < mny) mny = y; if (y > mxy) mxy = y;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue; const q = ny*W + nx; if (bin[q] && !vis[q]) { vis[q] = 1; st.push(q); } } }
+    const moldura = (mxy - mny + 1) >= .97 * H && (mxx - mnx + 1) <= .12 * H && (mxx < .10 * W || mnx > .90 * W);
+    if (comp.length < minA || moldura) for (const p of comp) bin[p] = 0;
+  }
+}
+/* Moldura, carcaça e linhas do visor dentro da região: componentes que tocam a borda da região, anéis vazados e linhas
+   horizontais longas são removidos. Os que tocam a borda e têm tamanho de dígito são guardados para checar depois se um
+   dígito foi cortado pela região (nesse caso a leitura é rejeitada, nunca lida sem ele). */
+function laBorda(bin, W, H){
+  const vis = new Uint8Array(W * H), st = [], cortados = [];
+  for (let i = 0; i < bin.length; i++) {
+    if (!bin[i] || vis[i]) continue;
+    const comp = []; let x0 = W, x1 = 0, y0 = H, y1 = 0; st.push(i); vis[i] = 1;
+    while (st.length) { const p = st.pop(); comp.push(p); const x = p % W, y = (p / W) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue; const q = ny*W + nx; if (bin[q] && !vis[q]) { vis[q] = 1; st.push(q); } } }
+    const w = x1 - x0 + 1, h = y1 - y0 + 1;
+    let miolo = 0; const ix0 = x0 + .2 * w, ix1 = x1 - .2 * w, iy0 = y0 + .2 * h, iy1 = y1 - .2 * h;
+    const grande = (w >= .6 * W && h >= .6 * H) || (w >= .3 * W && w >= 1.5 * h && h >= .1 * H);   // visor é mais largo que alto; dígito, mais alto que largo
+    if (grande) for (const p of comp) { const x = p % W, y = (p / W) | 0; if (x > ix0 && x < ix1 && y > iy0 && y < iy1) miolo++; }
+    const borda = x0 <= 1 || y0 <= 1 || x1 >= W - 2 || y1 >= H - 2;
+    const anel = grande && miolo < .03 * comp.length;   // moldura: contorno sem tinta no miolo
+    const linha = h <= .12 * H && w >= .3 * W;
+    if (!(borda || anel || linha)) continue;
+    for (const p of comp) bin[p] = 0;
+    if (borda && !anel && !linha && w < .9 * W && h < .9 * H) cortados.push({x0, x1, y0, y1, h});
+  }
+  return cortados;
+}
+function laBolha(Br, W2, x0, x1, ya, yb){   // maior componente conexa de tinta crua dentro da caixa (área em pixels)
+  const w = x1 - x0 + 1, h = yb - ya + 1; if (w < 1 || h < 1) return 0;
+  const vis = new Uint8Array(w * h), st = []; let best = 0;
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    if (vis[j*w + i] || !Br[(ya + j)*W2 + x0 + i]) continue;
+    let a = 0; st.push(j*w + i); vis[j*w + i] = 1;
+    while (st.length) { const p = st.pop(), pj = (p / w) | 0, pi = p % w; a++;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const nj = pj + dj, ni = pi + di; if (nj < 0 || ni < 0 || nj >= h || ni >= w) continue; const q = nj*w + ni; if (!vis[q] && Br[(ya + nj)*W2 + x0 + ni]) { vis[q] = 1; st.push(q); } } }
+    if (a > best) best = a;
+  }
+  return best;
+}
+function laTentar(gray, W, H, rng, pol){
+  const bin = laBinarizar(gray, W, H, pol, rng);
+  // foco: com borda nítida a área de tinta quase não muda ao endurecer o limiar; borrado encolhe (e some o ponto decimal)
+  let c1 = 0; for (let i = 0; i < bin.length; i++) c1 += bin[i];
+  const bin2 = laBinarizar(gray, W, H, pol, rng, .32); let c2 = 0; for (let i = 0; i < bin2.length; i++) c2 += bin2[i];
+  const foco = c1 ? c2 / c1 : 0;
+  if (foco < LA.focoMin) return {falha:'desfoque', foco};
+  const raw = Uint8Array.from(bin);
+  const cortados = laBorda(bin, W, H);
+  laLimpar(bin, W, H, Math.max(4, Math.round(W * H * .0005)));
+  // traços verticais longos: só os dígitos grandes os têm (texto HOLD, unidade, bateria e temperatura são menores)
+  const run = new Int32Array(W), topc = new Int32Array(W);
+  for (let x = 2; x < W - 2; x++) { let best = 0, bt = 0, cur = 0, ct = 0;
+    for (let y = 0; y < H; y++) { if (bin[y*W + x]) { if (!cur) ct = y; cur++; if (cur > best) { best = cur; bt = ct; } } else cur = 0; }
+    if (best < .92 * H) { run[x] = best; topc[x] = bt; } }
+  let vmax = 0; for (let x = 0; x < W; x++) if (run[x] > vmax) vmax = run[x];
+  if (vmax < Math.max(6, .15 * H)) return {falha:'digitos'};
+  let minTop = H, maxBot = 0; const R = new Uint8Array(W), ex = Math.ceil(.15 * vmax) + 2;
+  for (let x = 0; x < W; x++) if (run[x] >= .6 * vmax) { minTop = Math.min(minTop, topc[x]); maxBot = Math.max(maxBot, topc[x] + run[x] - 1); for (let k = Math.max(0, x - ex); k <= Math.min(W - 1, x + ex); k++) R[k] = 1; }
+  const rows = new Int32Array(H); for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (R[x]) rows[y] += bin[y*W + x];
+  const bands = [], gt = Math.max(2, Math.round(.10 * vmax)); let cur = null, gap = 0;
+  for (let y = 0; y < H; y++) { if (rows[y] > 0) { if (!cur) cur = [y, y]; else cur[1] = y; gap = 0; } else if (cur) { gap++; if (gap > gt) { bands.push(cur); cur = null; gap = 0; } } }
+  if (cur) bands.push(cur);
+  if (!bands.length) return {falha:'digitos'};
+  const ov = b => Math.max(0, Math.min(b[1], maxBot) - Math.max(b[0], minTop));
+  /* visor com duas linhas de dígitos grandes (lux em cima, temperatura embaixo): usa sempre a linha de cima */
+  const ovMax = Math.max(...bands.map(ov)), altas = bands.filter(b => ov(b) >= .6 * ovMax && ov(b) > 0).sort((p, q) => p[0] - q[0]);
+  const esc = altas.length ? altas[0] : bands.sort((p, q) => ov(q) - ov(p))[0];
+  const y0 = esc[0], y1 = esc[1], bh = y1 - y0 + 1;
+  if (bh < 8) return {falha:'digitos'};
+  const cand = LA.cal.shear === 'auto' ? Array.from({length:31}, (_, i) => [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8, 9, -9, 10, -10, 11, -11, 12, -12, 13, -13, 14, -14, 15, -15][i]) : [Number(LA.cal.shear) || 0];
+  const pad = Math.ceil(bh * .35) + 2, W2 = W + 2 * pad, ens = []; let best = null;
+  for (const a of cand) {
+    const t = Math.tan(a * Math.PI / 180), col = new Int32Array(W2);
+    for (let y = y0; y <= y1; y++) { const sh = Math.round((y - (y0 + y1) / 2) * t); for (let x = 0; x < W; x++) if (bin[y*W + x]) col[x + pad + sh]++; }
+    let e = 0; for (let x = 1; x < W2; x++) { const dcol = col[x] - col[x - 1]; e += dcol * dcol; }
+    ens.push([a, Math.round(e / 1000)]);
+    if (!best || e > best.e * 1.0005) best = {a, t, e};
+  }
+  const B = new Uint8Array(W2 * bh), Br = new Uint8Array(W2 * bh); const prevEns = ens;
+  for (let y = y0; y <= y1; y++) { const sh = Math.round((y - (y0 + y1) / 2) * best.t); for (let x = 0; x < W; x++) { if (bin[y*W + x]) B[(y - y0)*W2 + x + pad + sh] = 1; if (raw[y*W + x]) Br[(y - y0)*W2 + x + pad + sh] = 1; } }
+  const prev = {B, W2, bh, digs:[], dps:[], ens:prevEns};
+  const cs = new Int32Array(W2); for (let y = 0; y < bh; y++) for (let x = 0; x < W2; x++) cs[x] += B[y*W2 + x];
+  const groups = []; let g = null;
+  for (let x = 0; x < W2; x++) { if (cs[x] > 0) { if (!g) g = {x0:x, x1:x}; else g.x1 = x; } else if (g) { groups.push(g); g = null; } }
+  if (g) groups.push(g);
+  const extV = (gr, ya0, yb0) => { let a = yb0 + 1, b = ya0 - 1;
+    for (let y = ya0; y <= yb0; y++) for (let x = gr.x0; x <= gr.x1; x++) if (B[y*W2 + x]) { if (y < a) a = y; if (y > b) b = y; }
+    gr.y0 = a; gr.y1 = b; gr.h = b - a + 1; gr.w = gr.x1 - gr.x0 + 1; };
+  for (const gr of groups) extV(gr, 0, bh - 1);
+  prev.groups = groups; prev.sh = best.a; prev.band = [y0, y1];
+  let digs = groups.filter(q => q.h >= .7 * bh); const dps = groups.filter(q => q.h <= .3 * bh && q.y0 >= .55 * bh && q.w <= .3 * bh);
+  if (!digs.length) return {falha:'digitos', prev};
+  const ya = Math.min(...digs.map(q => q.y0)), yb = Math.max(...digs.map(q => q.y1)), hd = yb - ya + 1; prev.ya = ya; prev.yb = yb;
+  if (cortados.some(c => Math.min(c.y1, y0 + yb) - Math.max(c.y0, y0 + ya) + 1 >= .6 * hd && c.h <= 1.3 * hd)) return {falha:'cortado', prev};   // dígito encostado na borda da região
+  if (digs.some(q => q.w > .78 * hd)) return {falha:'colados', prev};
+  if (groups.some(q => !digs.includes(q) && !dps.includes(q) && q.x1 < digs[0].x0 && q.y0 > .3 * bh && q.y1 < .7 * bh)) return {falha:'padrao', prev};   // sinal de menos
+  const wide = digs.map(q => q.w).filter(w => w >= .42 * bh).sort((a, b) => a - b), stdW = wide.length ? wide[wide.length >> 1] : .55 * bh;
+  const soBaixo = (xa, xb) => { for (let x = xa; x <= xb; x++) for (let y = 0; y < Math.round(.62 * bh); y++) if (B[y*W2 + x]) return false; return true; };
+  for (const q of digs) if (q.w > 1.22 * stdW) {
+    let a = q.x0; while (a < q.x1 && soBaixo(a, a)) a++;           // colunas à esquerda só com tinta na parte de baixo
+    let z = q.x1; while (z > q.x0 && soBaixo(z, z)) z--;           // idem à direita
+    const lasca = (xa, xb) => { const g = {x0:xa, x1:xb}; extV(g, 0, bh - 1); return g; };
+    if (a - q.x0 >= 2 && a - q.x0 <= .3 * bh) { dps.push(lasca(q.x0, a - 1)); q.x0 = a; }
+    if (q.x1 - z >= 2 && q.x1 - z <= .3 * bh) { dps.push(lasca(z + 1, q.x1)); q.x1 = z; }
+    q.w = q.x1 - q.x0 + 1;
+  }
+  for (const q of digs) { if (q.w > 1.22 * stdW) return {falha:'colados', prev}; if (q.w < .5 * stdW) { q.fx0 = Math.max(0, q.x1 - Math.round(stdW)); q.fx1 = q.x1; } else { q.fx0 = q.x0; q.fx1 = q.x1; } }
+  for (let i = 0; i < digs.length - 1; i++) if (digs[i+1].fx0 - digs[i].fx1 > .9 * stdW) return {falha:'espaco', prev};
+  const frac = (x0, x1, ya, yb) => { x0 = Math.max(0, x0); x1 = Math.min(W2 - 1, x1); let s = 0, n = 0; for (let y = ya; y <= yb; y++) for (let x = x0; x <= x1; x++) { s += B[y*W2 + x]; n++; } return n ? s / n : 0; };
+  let amb = 0, invalido = false;
+  for (const q of digs) {
+    const fw = q.fx1 - q.fx0 + 1, bits = [], segs = {};
+    for (const k of 'abcdefg') { const [u0, u1, v0, v1] = LA_SEG[k], X0 = Math.round(q.fx0 + u0 * fw), X1 = Math.round(q.fx0 + u1 * fw), Y0 = ya + Math.round(v0 * (hd - 1)), Y1 = ya + Math.round(v1 * (hd - 1)), f = frac(X0, X1, Y0, Y1);
+      segs[k] = {f, X0, X1, Y0, Y1}; if (f > .25 && f < .5) amb++; bits.push(f >= .5 ? 1 : 0); }
+    q.segs = segs; q.ch = LA_PAT[bits.join('')]; if (q.ch == null) invalido = true;
+  }
+  prev.digs = digs; prev.dps = dps;
+  if (invalido) return {falha:'padrao', prev};
+  if (amb) return {falha:'ambiguo', prev};
+  let dpApos = -1; const dpEntre = [];
+  for (let i = 0; i < digs.length - 1; i++) {
+    const gx0 = digs[i].x1 + 1, gx1 = digs[i + 1].x0 - 1; if (gx1 < gx0) continue;
+    const temGrupo = dps.some(dp => { const cx = (dp.x0 + dp.x1) / 2; return cx >= gx0 && cx <= gx1; });
+    const f = frac(gx0, gx1, Math.round(.70 * (bh - 1)), bh - 1), area = laBolha(Br, W2, gx0, gx1, Math.round(.70 * (bh - 1)), bh - 1);
+    if (temGrupo || area >= Math.pow(.06 * hd, 2)) dpEntre.push(i); else if (area >= Math.pow(.03 * hd, 2) || f >= .045) return {falha:'ambiguo', prev};   // tinta no vão sem forma de ponto: não adivinha
+  }
+  if (dpEntre.length > 1) return {falha:'ponto', prev};
+  if (dpEntre.length === 1) dpApos = dpEntre[0];
+  const texto = digs.map((q, i) => q.ch + (i === dpApos ? '.' : '')).join(''), valor = parseFloat(texto);
+  if (!isFinite(valor) || valor < 0 || valor > 200000) return {falha:'faixa', prev, texto};
+  return {valor, texto, prev};
+}
+function laDecodificar(gray, W, H){
+  const [lo, hi] = laPercentis(gray), rng = hi - lo, res = {rng, nit:laNitidez(gray, W, H, Math.max(rng, 1))};
+  if (rng < 35) return {...res, falha:'contraste'};
+  let pol = LA.cal.pol;
+  if (pol === 'auto') {   // tinta = lado de brilho mais "puxado" em relação à mediana (dígitos são minoria; o fundo fica perto da mediana)
+    const srt = Float32Array.from(gray).sort(), med = srt[srt.length >> 1], d = .25 * rng; let fd = 0, fl = 0;
+    for (let i = 0; i < gray.length; i++) { if (gray[i] < med - d) fd++; else if (gray[i] > med + d) fl++; }
+    pol = fd >= fl ? 'dark' : 'light';
+  }
+  return {...res, ...laTentar(gray, W, H, rng, pol)};
+}
+function laAnalisarFonte(src, sw, sh){
+  const roi = LA.cal.roi, rx = Math.max(0, Math.round(roi.x * sw)), ry = Math.max(0, Math.round(roi.y * sh)), rw = Math.min(sw - rx, Math.round(roi.w * sw)), rh = Math.min(sh - ry, Math.round(roi.h * sh));
+  if (rw < 20 || rh < 10) return {falha:'regiao'};
+  const Wc = Math.min(360, rw), Hc = Math.max(8, Math.round(rh * Wc / rw)), cv = LA.cv || (LA.cv = document.createElement('canvas'));
+  cv.width = Wc; cv.height = Hc; const g = cv.getContext('2d', {willReadFrequently:true}); g.drawImage(src, rx, ry, rw, rh, 0, 0, Wc, Hc);
+  const d = g.getImageData(0, 0, Wc, Hc).data, gray = new Float32Array(Wc * Hc);
+  for (let i = 0; i < gray.length; i++) gray[i] = .299 * d[i*4] + .587 * d[i*4 + 1] + .114 * d[i*4 + 2];
+  return laDecodificar(gray, Wc, Hc);
+}
+function laDesenharPrev(r){
+  const c = $('laPrev'), g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+  if (!r || !r.prev || !r.prev.B) return;
+  const {B, W2, bh, digs} = r.prev, k = Math.min(c.width / W2, c.height / bh); g.fillStyle = '#111';
+  for (let y = 0; y < bh; y++) for (let x = 0; x < W2; x++) if (B[y*W2 + x]) g.fillRect(Math.floor(x * k), Math.floor(y * k), Math.ceil(k), Math.ceil(k));
+  for (const q of digs) if (q.segs) for (const s of Object.values(q.segs)) { g.strokeStyle = s.f >= .5 ? '#159447' : s.f > .25 ? '#e0a100' : 'rgba(198,47,47,.55)'; g.lineWidth = 1; g.strokeRect(s.X0 * k, s.Y0 * k, (s.X1 - s.X0) * k, (s.Y1 - s.Y0) * k); }
+}
+const laNum = v => String(v).replace('.', ',');
+/* multiplicador do visor (X10, X100): o valor gravado é o lido × multiplicador */
+const laMult = () => Number(LA.cal.mult) || 1;
+const laReal = v => Math.round(v * laMult() * 1000) / 1000;
+const laTxt = v => laMult() > 1 ? `${laNum(v)} × ${laMult()} = ${laNum(laReal(v))} lx` : `${laNum(v)} lx`;
+const laCtxOk = () => !!(LA.ctx && sel != null && state.pontos[sel] && state.pontos[sel].id === LA.ctx.id);
+function laUI(valorTxt, estado, cnt){
+  $('laValor').textContent = valorTxt; $('laEstado').textContent = estado;
+  $('laEst').textContent = `Leituras consistentes: ${cnt}/${LA.cal.cons} (consistência do reconhecimento, não do instrumento)`;
+  $('laBarra').style.width = Math.min(100, 100 * cnt / LA.cal.cons) + '%';
+  $('laConfirmar').disabled = !LA.stable;
+}
+function laDesenharOverlay(){
+  const o = $('laOver'), v = LA.foto ? $('laImg') : $('laVideo'); const w = v.clientWidth, h = v.clientHeight; if (!w || !h) return;
+  if (o.width !== w || o.height !== h) { o.width = w; o.height = h; }
+  const g = o.getContext('2d'); g.clearRect(0, 0, w, h);
+  const roi = LA.drag ? LA.drag : LA.cal.roi; g.lineWidth = 2; g.strokeStyle = LA.stable ? '#2ecc71' : '#ffd23f'; g.setLineDash(LA.drag ? [6, 4] : []);
+  g.strokeRect(roi.x * w, roi.y * h, roi.w * w, roi.h * h);
+}
+function laSnapshot(v){
+  const k = Math.min(1, 1280 / Math.max(v.videoWidth, v.videoHeight)), c = document.createElement('canvas');
+  c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k); c.getContext('2d').drawImage(v, 0, 0, c.width, c.height); return c;
+}
+function laTick(){
+  if (LA.busy || document.hidden) return; const v = $('laVideo'); if (!v.videoWidth || v.readyState < 2) return;
+  if (!laCtxOk()) { laStop(); toast('Leitura interrompida: o ponto selecionado mudou.'); return; }
+  LA.busy = true;
+  try {
+    const r = laAnalisarFonte(v, v.videoWidth, v.videoHeight); LA.ultimo = r; laDesenharPrev(r);
+    if (r.valor == null) { LA.cnt = 0; LA.ref = null; LA.stable = false; LA.best = null; laUI(r.texto ? r.texto.replace('.', ',') + ' (rejeitado)' : '— lx', LA_MSG[r.falha] || 'Sem leitura.', 0); }
+    else {
+      if (LA.ref != null && Math.abs(r.valor - LA.ref) <= LA.cal.tol + 1e-9) LA.cnt++; else { LA.cnt = 1; LA.ref = r.valor; LA.best = null; }
+      if (!LA.best || r.nit > LA.best.nit) LA.best = {nit:r.nit, cv:laSnapshot(v)};
+      LA.stable = LA.cnt >= LA.cal.cons;
+      laUI(laTxt(r.valor), LA.stable ? 'Leitura estável — confira o valor' : 'Reconhecendo…', Math.min(LA.cnt, LA.cal.cons));
+    }
+  } finally { LA.busy = false; laDesenharOverlay(); }
+}
+function laStop(msg){
+  if (LA.timer) { clearInterval(LA.timer); LA.timer = null; }
+  LA.ctx = null; LA.ref = null; LA.cnt = 0; LA.stable = false; LA.best = null; LA.ultimo = null; LA.foto = null;
+  if ($('laImg')) { $('laImg').hidden = true; $('laImg').removeAttribute('src'); $('laVideo').hidden = false; $('laRec').hidden = false; }
+  const v = $('laVideo'); if (v) v.srcObject = null;
+  if ($('laCamBox')) { $('laCamBox').hidden = true; $('laParar').hidden = true; $('laParar').textContent = 'Interromper leitura'; $('laIniciar').hidden = false; $('laConfirmar').disabled = true; }
+  if (msg) { $('laAviso').textContent = msg; $('laAviso').hidden = false; }
+}
+function laMsgPermissao(){
+  const arq = /^(file|content):/.test(location.protocol), app = /; wv\)|FBAN|FBAV|Instagram|WhatsApp|Line\//i.test(navigator.userAgent);
+  if (arq) return 'A câmera ao vivo foi bloqueada porque a ferramenta está aberta como arquivo (endereço file:// ou content://): nesse modo o celular não oferece a permissão de câmera. Use “Ler valor de uma foto” (abre a câmera do aparelho e lê a foto) ou abra a ferramenta por um endereço https://.';
+  if (app) return 'A câmera ao vivo foi bloqueada porque a ferramenta abriu dentro de outro aplicativo (WhatsApp, e-mail, Drive…). Abra no Chrome ou no Safari, ou use “Ler valor de uma foto”.';
+  return 'Permissão da câmera negada. No Chrome: toque no ícone ao lado do endereço › Permissões › Câmera › Permitir e recarregue a página. No iPhone: Ajustes › Safari › Câmera › Permitir. Ou use “Ler valor de uma foto”, que não precisa dessa permissão.';
+}
+async function laIniciar(){
+  if (sel == null) return; const av = $('laAviso'); av.hidden = true;
+  if (!podeLive) { av.textContent = 'A câmera contínua exige HTTPS (ou localhost) e um navegador compatível. Use “Ler valor de uma foto”.'; av.hidden = false; return; }
+  pararCamera();
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080}}, audio:false});
+  } catch (e) {
+    av.textContent = (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) ? laMsgPermissao() : (e && e.name === 'NotFoundError') ? 'Nenhuma câmera encontrada neste aparelho. Use “Ler valor de uma foto”.' : 'Não foi possível abrir a câmera: ' + ((e && e.message) || e) + '. Use “Ler valor de uma foto”.';
+    av.hidden = false; return;
+  }
+  const tr = stream.getVideoTracks()[0];
+  try { await tr.applyConstraints({advanced:[{focusMode:'continuous'}]}); } catch (e) {}
+  tr.addEventListener('ended', () => { if (LA.ctx) { stream = null; laStop('A câmera foi interrompida.'); } });
+  const v = $('laVideo'); v.srcObject = stream; try { await v.play(); } catch (e) {}
+  LA.ctx = {id:state.pontos[sel].id}; LA.ref = null; LA.cnt = 0; LA.stable = false; LA.best = null;
+  $('laCamBox').hidden = false; $('laIniciar').hidden = true; $('laParar').hidden = false; laUI('— lx', 'Aguardando o visor…', 0);
+  if (LA.timer) clearInterval(LA.timer); LA.timer = setInterval(laTick, 400);
+}
+async function laConfirmar(fonteCv, valor, origem){
+  // fonteCv: canvas/imagem da foto; valor: leitura reconhecida
+  if (sel == null) return false; const p = state.pontos[sel];
+  if (origem === 'video' && !laCtxOk()) { toast('O ponto mudou: leitura descartada.'); laStop(); return false; }
+  const lido = valor; valor = laReal(valor);
+  const atual = $('lux').value.trim();
+  if ((p.lux != null || atual !== '') && Math.abs((num(atual) ?? NaN) - valor) > 1e-9) {
+    if (!(await confirmar(`O ponto ${nro(p)} já tem ${atual !== '' ? 'o valor ' + atual : 'medição'}. Substituir por ${laNum(valor)} ${unid(p)}?`, 'Substituir', 'danger'))) return false;
+  }
+  fotoTemp = carimbar(fonteCv, fonteCv.naturalWidth || fonteCv.width, fonteCv.naturalHeight || fonteCv.height);
+  $('lux').value = laNum(valor) + ' ' + unid(p); $('luxErr').hidden = true; LA.conf = {id:p.id, v:valor};
+  pararCamera(); mostrarFoto(fotoTemp);
+  toast(`Leitura ${laMult() > 1 ? laNum(lido) + ' × ' + laMult() + ' = ' : ''}${laNum(valor)} ${unid(p)} preenchida. Confira e toque em Salvar.`);
+  return true;
+}
+$('laIniciar').onclick = laIniciar;
+$('laMult').value = String(laMult());
+$('laMult').onchange = () => { LA.cal.mult = Number($('laMult').value) || 1; laSalvarCal(); if (LA.foto && LA.ultimo) laMostrarFoto(LA.ultimo); };
+$('lux').addEventListener('blur', () => { if (sel == null) return; const v = luxDoCampo($('lux').value); if (isFinite(v)) $('lux').value = laNum(v) + ' ' + unid(state.pontos[sel]); });
+$('laParar').onclick = () => { const s0 = stream; pararCamera(); };
+$('laConfirmar').onclick = async () => { if (!LA.stable || !LA.best || LA.ref == null) return; const cv = LA.best.cv, v = LA.ref, foto = !!LA.foto; await laConfirmar(cv, v, foto ? 'foto' : 'video'); if (foto) laStop(); };
+/* Leitura a partir de foto: a foto aparece no quadro, a região marcada é aplicada e pode ser redesenhada (relê na hora).
+   Se a região salva não ler, tenta a foto inteira (sem moldura, a busca acha a linha principal). */
+/* Procura o visor na foto: varre janelas de vários tamanhos e posições e lê cada uma com o mesmo decodificador.
+   Só aceita um valor que apareça em pelo menos 2 janelas diferentes e sem outro valor igualmente votado — uma leitura
+   isolada pode ser ruído, e o sistema nunca escolhe entre leituras conflitantes. */
+async function laProcurar(img0, prog, vivo){
+  vivo = vivo || (() => !!LA.foto);
+  const iw = img0.naturalWidth || img0.width, ih = img0.naturalHeight || img0.height;
+  /* fonte em escala reduzida (≤ 1000 px): a leitura de cada janela já trabalha em ≤ 360 px de largura */
+  const k0 = Math.min(1, 1000 / Math.max(iw, ih));
+  const base = document.createElement('canvas'); base.width = Math.round(iw * k0); base.height = Math.round(ih * k0);
+  base.getContext('2d').drawImage(img0, 0, 0, base.width, base.height);
+  const roi0 = LA.cal.roi, ler = (src, roi) => { LA.cal.roi = roi; return laAnalisarFonte(src, src.width, src.height); };
+  const clamp = r => { const x = Math.max(0, r.x), y = Math.max(0, r.y); return {x, y, w:Math.min(1 - x, r.x + r.w - x), h:Math.min(1 - y, r.y + r.h - y)}; };
+  /* janela ampliada (meia largura para cada lado): uma leitura parcial (dígito vizinho fora da janela) não se repete nela */
+  const confirma = (src, roi, texto) => { const e = clamp({x:roi.x - .25 * roi.w, y:roi.y - .2 * roi.h, w:1.5 * roi.w, h:1.4 * roi.h}); const r = ler(src, e); return r.valor != null && r.texto === texto; };
+  let feitos = 0, t0 = performance.now(); const angulos = [0, 5, -5], tot = angulos.length, busca = LA.busca;
+  try {
+    for (let ai = 0; ai < angulos.length; ai++) {
+      let src = base; const ang = angulos[ai];
+      if (ang) { src = document.createElement('canvas'); src.width = base.width; src.height = base.height; const g = src.getContext('2d'); g.fillStyle = '#808080'; g.fillRect(0, 0, src.width, src.height);
+        g.translate(src.width / 2, src.height / 2); g.rotate(ang * Math.PI / 180); g.drawImage(base, -base.width / 2, -base.height / 2); }
+      const W = src.width, H = src.height, cand = [];
+      for (const fw of [.85, .65, .5, .38, .28, .2]) for (const ar of (fw >= .6 ? [.4] : [.35, .6, 1.2])) {   // visores horizontais e verticais
+        const w = fw * W, h = Math.min(H, w * ar); if (h < 24) continue;
+        for (let y = 0; y + h <= H + 1; y += h / 3) for (let x = 0; x + w <= W + 1; x += w / 4) cand.push({x:x / W, y:y / H, w:w / W, h:h / H});
+      }
+      const votos = new Map();
+      for (let i = 0; i < cand.length; i++) {
+        const r = ler(src, cand[i]); feitos++;
+        if (r.valor != null && r.texto.replace('.', '').length >= 2 && confirma(src, cand[i], r.texto)) {   // na busca automática: pelo menos 2 dígitos
+          const lst = votos.get(r.texto) || []; lst.push({roi:cand[i], r}); votos.set(r.texto, lst);
+        }
+        if (performance.now() - t0 > 40) { if (prog) prog((ai + i / cand.length) / tot); await new Promise(res => setTimeout(res, 0)); t0 = performance.now(); if (!vivo() || LA.busca !== busca) return null; }
+      }
+      let ord = [...votos.values()].filter(l => l.length >= 3).sort((a, b) => b.length - a.length);
+      if (ord.length > 1) {
+        /* duas linhas empilhadas no mesmo visor (lux em cima, temperatura embaixo): vale a de cima; qualquer outro conflito: não escolhe */
+        const cy = l => l.reduce((a, v) => a + v.roi.y + v.roi.h / 2, 0) / l.length, cx = l => l.reduce((a, v) => a + v.roi.x + v.roi.w / 2, 0) / l.length;
+        const top = [...ord].sort((a, b) => cy(a) - cy(b))[0], wTop = top.reduce((a, v) => a + v.roi.w, 0) / top.length;
+        const empilhadas = ord.every(l => l === top || (cy(l) > cy(top) && Math.abs(cx(l) - cx(top)) < .5 * wTop && cy(l) - cy(top) < 1.5 * wTop));
+        if (!empilhadas) return null;
+        ord = [top];
+      }
+      if (ord.length) {
+        const m = ord[0].reduce((a, v) => (v.r.nit || 0) > (a.r.nit || 0) ? v : a);
+        return {...m, ang};
+      }
+    }
+  } finally { LA.cal.roi = roi0; }
+  return null;
+}
+function laMostrarFoto(r){
+  LA.ultimo = r; laDesenharPrev(r);
+  if (r.valor != null) {
+    LA.ref = r.valor; LA.cnt = LA.cal.cons; LA.stable = true; LA.best = {nit:r.nit || 0, cv:LA.foto};
+    laUI(laTxt(r.valor), 'Valor reconhecido na foto — confira com o visor antes de confirmar.', LA.cal.cons);
+  } else {
+    LA.ref = null; LA.cnt = 0; LA.stable = false; LA.best = null;
+    laUI(r.texto ? r.texto.replace('.', ',') + ' (rejeitado)' : '— lx', (LA_MSG[r.falha] || 'Valor não reconhecido.') + ' Arraste sobre a foto para marcar só os números do visor.', 0);
+  }
+  laDesenharOverlay();
+}
+/* região marcada com o visor torto na foto: tenta endireitar girando a foto em torno do centro da região */
+/* região salva; se não ler, a foto inteira e a região padrão (foto de perto do display) — a região que leu fica salva */
+function laLerRegioes(img){
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, salva = LA.cal.roi;
+  const r0 = laAnalisarFonte(img, iw, ih); if (r0.valor != null) return r0;
+  for (const roi of [{x:0, y:0, w:1, h:1}, {x:.15, y:.25, w:.70, h:.45}, {x:.05, y:.1, w:.9, h:.8}]) {
+    LA.cal.roi = roi; const r = laAnalisarFonte(img, iw, ih);
+    if (r.valor != null) { laSalvarCal(); return r; }
+  }
+  LA.cal.roi = salva; return r0;
+}
+function laLerGirando(img){
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const r0 = laLerRegioes(img); if (r0.valor != null) return r0;
+  const k = Math.min(1, 1200 / Math.max(iw, ih)), W = Math.round(iw * k), H = Math.round(ih * k);
+  const roi = LA.cal.roi, cx = (roi.x + roi.w / 2) * W, cy = (roi.y + roi.h / 2) * H, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  for (const a of [3, -3, 6, -6, 9, -9]) {
+    g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#808080'; g.fillRect(0, 0, W, H);
+    g.translate(cx, cy); g.rotate(a * Math.PI / 180); g.translate(-cx, -cy); g.drawImage(img, 0, 0, W, H);
+    const r = laAnalisarFonte(c, W, H); if (r.valor != null) return r;
+  }
+  return r0;
+}
+async function laAnalisarFoto(procurar){
+  const img = LA.foto; if (!img) return;
+  const r = laLerGirando(img);
+  if (r.valor != null || !procurar) { laMostrarFoto(r); return; }
+  laUI('— lx', 'Procurando o visor na foto…', 0);
+  const b0 = LA.busca;
+  const achou = await laProcurar(img, f => laUI('— lx', `Procurando o visor na foto… ${Math.round(f * 100)}% (ou marque o visor arrastando sobre a foto)`, 0));
+  if (img !== LA.foto || LA.busca !== b0) return;
+  if (achou) { if (!achou.ang) { LA.cal.roi = achou.roi; laSalvarCal(); } laMostrarFoto(achou.r); }
+  else laMostrarFoto({...r, falha:r.falha || 'digitos'});
+}
+$('laFoto').onchange = e => {
+  const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f || sel == null) return;
+  const fr = new FileReader(), av = $('laAviso');
+  fr.onload = () => {
+    const img = $('laImg');
+    img.onload = () => {
+      av.hidden = true;
+      fotoTemp = carimbar(img, img.naturalWidth, img.naturalHeight); mostrarFoto(fotoTemp);   // a foto fica anexada mesmo sem leitura
+      LA.foto = img; LA.ctx = {id:state.pontos[sel].id};
+      $('laVideo').hidden = true; $('laRec').hidden = true; img.hidden = false;
+      $('laCamBox').hidden = false; $('laIniciar').hidden = false; $('laParar').hidden = false; $('laParar').textContent = 'Fechar foto';
+      requestAnimationFrame(() => laAnalisarFoto(true));
+    };
+    img.onerror = () => toast('Não foi possível ler esta imagem.');
+    img.src = fr.result;
+  };
+  fr.readAsDataURL(f);
+};
+/* região do visor: arrastar sobre a imagem */
+const laPos = e => { const r = $('laOver').getBoundingClientRect(); return {x:Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y:Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))}; };
+$('laOver').addEventListener('pointerdown', e => { LA.busca = (LA.busca || 0) + 1; e.preventDefault(); $('laOver').setPointerCapture(e.pointerId); const p = laPos(e); LA.drag = {x:p.x, y:p.y, w:0, h:0, x0:p.x, y0:p.y}; });
+$('laOver').addEventListener('pointermove', e => { if (!LA.drag) return; const p = laPos(e), d = LA.drag; d.x = Math.min(d.x0, p.x); d.y = Math.min(d.y0, p.y); d.w = Math.abs(p.x - d.x0); d.h = Math.abs(p.y - d.y0); laDesenharOverlay(); });
+$('laOver').addEventListener('pointerup', () => { const d = LA.drag; LA.drag = null; if (d && d.w > .05 && d.h > .04) { LA.cal.roi = {x:d.x, y:d.y, w:d.w, h:d.h}; laSalvarCal(); LA.cnt = 0; LA.ref = null; LA.stable = false; LA.best = null; if (LA.foto) { laAnalisarFoto(false); return; } } laDesenharOverlay(); });
+$('laRedef').onclick = () => { LA.cal.roi = {x:.15, y:.25, w:.70, h:.45}; laSalvarCal(); LA.cnt = 0; LA.ref = null; LA.stable = false; if (LA.foto) laAnalisarFoto(false); else laDesenharOverlay(); };
+for (const [id, k] of [['laShear', 'shear'], ['laPol', 'pol'], ['laTol', 'tol'], ['laCons', 'cons']]) {
+  $(id).value = LA.cal[k];
+  $(id).onchange = () => { const v = $(id).value; LA.cal[k] = (k === 'tol') ? Math.max(0, num(v) || 0) : (k === 'cons') ? Math.max(3, Math.min(10, parseInt(v, 10) || 3)) : v; if (k === 'cons') $(id).value = LA.cal.cons; laSalvarCal(); LA.cnt = 0; LA.ref = null; LA.stable = false; if (LA.foto) laAnalisarFoto(false); };
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && LA.ctx) pararCamera(); });
+$('btnCaso').onclick = async () => {
+  if (!state.cfg) return;
+  const nAuto = state.pontos.filter(p => p.auto).length;
+  if (!nAuto) {
+    const m = estimarPendentes(true);
+    if (!m.size) { toast('Não há pontos pendentes com vizinhos medidos para preencher.'); return; }
+    if (!(await confirmar(`${m.size} ponto(s) pendente(s) serão preenchidos automaticamente (interpolação dos vizinhos medidos) e passarão a aparecer como preenchidos na malha, nos registros e nos relatórios, sem marca individual. Para o material não ser confundido com levantamento de campo, o documento fica identificado como “ESTUDO DE CASO — valores ilustrativos” (nome da via, observações, aviso no topo e nome do arquivo). Use apenas para exemplos e escopos.`, 'Gerar estudo de caso'))) return;
+    state.estOn = false;
+    for (const p of state.pontos) if (p.lux == null && m.has(p.id)) { p.lux = Math.round(m.get(p.id) * (unid(p) === 'cd/m²' ? 100 : 10)) / (unid(p) === 'cd/m²' ? 100 : 10); p.auto = true; }
+    state.exemplo = true;
+  } else {
+    if (!(await confirmar(`Desfazer o estudo de caso? Os ${nAuto} ponto(s) preenchidos automaticamente voltam a pendentes.`, 'Desfazer', 'danger'))) return;
+    for (const p of state.pontos) if (p.auto) { p.lux = null; delete p.auto; }
+    state.exemplo = false;
+  }
+  renderTudo(); await salvar(); renderLevs();
+};
+$('btnLimpar').onclick = async () => {
+  const med = nMed();
+  if (!med) { toast('Nenhuma medição para limpar.'); return; }
+  if (!(await confirmar(`Apagar ${med} medição(ões) e fotos deste levantamento?`, 'Apagar', 'danger'))) return;
+  state.pontos.forEach(p => { p.lux = null; p.foto = null; p.hora = null; delete p.auto; delete p.imp; delete p.ocr; }); state.exemplo = false;
+  await fotosApagarLev(state.id); renderTudo(); await salvar(); renderLevs();
+};
+document.querySelectorAll('input[name=calc]').forEach(r => r.onchange = () => { syncCalcUI(); checarDirty(); });
+['S','L','faixas','Lc1','Lc2'].forEach(k => $(k).addEventListener('input', checarDirty));
+let tCfg = null;
+['municipio','via','data','resp','luximetro','postes','classeC','classeP','obs'].forEach(k => $(k).addEventListener('input', () => {
+  if (!state.cfg) return;
+  state.cfg[k] = $(k).value.trim();
+  if (['postes','classeC','classeP'].includes(k)) renderTudo();
+  clearTimeout(tCfg); tCfg = setTimeout(async () => { await salvar(); renderLevs(); }, 500);
+}));
+$('levs').addEventListener('click', e => {
+  const a = e.target.closest('[data-abrir]'), x = e.target.closest('[data-excluir]');
+  if (a) abrirLev(a.dataset.abrir); else if (x) excluirLev(x.dataset.excluir);
+});
+$('bkN').onchange = () => { bkN = +$('bkN').value; try { localStorage.setItem(LS_BK, String(bkN)); } catch(e) {} };
+$('btnArq').onclick = salvarArquivo;
+$('inCad').onchange = e => { lerCadastro(e.target.files[0]); e.target.value = ''; };
+$('btnModelo').onclick = baixarModelo;
+$('cadCol').onchange = () => { cadF.col = +$('cadCol').value; cadF.val = ''; salvarFiltro(); valoresFiltro(); listaEnderecos(); };
+$('cadVal').onchange = () => { cadF.val = $('cadVal').value; salvarFiltro(); listaEnderecos(); };
+$('cadBusca').addEventListener('input', listaEnderecos);
+$('cadEnd').onchange = () => { const v = $('cadEnd').value; if (v !== '') aplicarLinha(+v); };
+$('btnCadRem').onclick = async () => {
+  if (!(await confirmar('Remover o banco de dados deste aparelho? Os levantamentos não são afetados.', 'Remover', 'danger'))) return;
+  cadastro = null; try { await tx('meta','readwrite', s => s.delete('cadastroVias')); } catch(e) {} renderCadastro(); };
+$('malha').addEventListener('click', e => { const g = e.target.closest('.pt'); if (g) abrir(+g.dataset.i); });
+$('malha').addEventListener('keydown', e => { const g = e.target.closest('.pt'); if (g && (e.key==='Enter'||e.key===' ')) { e.preventDefault(); abrir(+g.dataset.i); } });
+$('tbody').addEventListener('click', e => { const tr = e.target.closest('tr[data-i]'); if (tr) abrir(+tr.dataset.i); });
+$('filtro').onchange = renderTabela;
+$('btnProx').onclick = () => { const i = proximoPendente(-1); if (i != null) abrir(i); };
+$('btnFit').onclick = () => { fitMode = !fitMode; $('svgwrap').classList.toggle('fit', fitMode); $('btnFit').textContent = fitMode ? 'Tamanho real' : 'Ajustar à tela'; };
+$('mClose').onclick = fechar;
+$('modal').addEventListener('click', e => { if (e.target === $('modal')) fechar(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('modal').hidden) fechar(); });
+$('inCam').onchange = e => { lerArquivoFoto(e.target.files[0]); e.target.value = ''; };
+$('inGal').onchange = e => { lerArquivoFoto(e.target.files[0]); e.target.value = ''; };
+$('btnLive').hidden = !podeLive;
+$('camNote').textContent = podeLive ? '' : '“Tirar foto” abre a câmera nativa do celular e funciona mesmo com o arquivo aberto direto do aparelho.';
+$('btnLive').onclick = () => stream ? pararCamera() : iniciarCamera();
+$('btnSnap').onclick = capturar;
+$('btnTiraFoto').onclick = () => { fotoTemp = null; mostrarFoto(null); };
+$('lux').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); salvarPonto(true); } });
+$('lux').addEventListener('input', () => $('luxErr').hidden = true);
+$('btnSalvar').onclick = () => salvarPonto(false);
+$('btnSalvarProx').onclick = () => salvarPonto(true);
+$('btnApagar').onclick = apagarPonto;
+$('btnCsv').onclick = exportarCSV;
+$('btnRel').onclick = exportarRelatorio;
+$('btnPdf').onclick = exportarPDF;
+$('inJson').onchange = e => { importarJSON(e.target.files[0]); e.target.value = ''; };
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && state.id) salvar({semArquivo:true}); });
+
+restaurar().catch(e => { mostrarFalha(e && e.message || String(e)); if (!state.id) gerar(true, true); });
+</script>
+<script>
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
