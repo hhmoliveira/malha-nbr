@@ -317,6 +317,16 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
     <button class="btn ghost" id="btnCsv">Exportar CSV</button>
     <button class="btn primary" id="btnPacote">Exportar pasta completa (.zip)</button>
   </div>
+  <div class="lf">
+    <h3 style="margin-top:0">Leitura das fotos (escritório)</h3>
+    <div class="grid">
+      <div class="fld"><label for="lfModo">Método</label><select id="lfModo"><option value="ia">IA online (chave de API)</option><option value="local">Leitura local do visor (sem internet)</option></select></div>
+      <div class="fld" id="lfKeyWrap"><label for="lfKey">Chave de API</label><input id="lfKey" type="password" autocomplete="off" placeholder="sk-ant-…"></div>
+    </div>
+    <div class="actions"><button class="btn primary" id="lfIr">Ler valores das fotos</button></div>
+    <p class="note" id="lfSt"></p>
+    <p class="note">A leitura só sugere o valor de cada ponto com foto e sem valor. Nada entra na conformidade até você conferir a foto e confirmar, ponto a ponto, em “Conferir fotos”.</p>
+  </div>
   <p class="note">O CSV abre direto no Excel (separador “;” e vírgula decimal). Para guardar ou continuar o trabalho em outro aparelho, use “Salvar arquivo no aparelho”.</p>
 </section>
 </main>
@@ -742,7 +752,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>${EST_CSS}</style>`);
 const ESTUDO_TXT = 'ESTUDO DE CASO — documento de exemplo com valores ilustrativos; não constitui levantamento de campo nem laudo.';
 const casoOn = () => !!state.exemplo && state.pontos.some(p => p.auto);
 const impN = () => state.pontos.filter(p => p.imp).length;
-const ocrN = () => state.pontos.filter(p => p.ocr).length;
+const ocrN = () => state.pontos.filter(p => p.ocr || p.lidoPor).length;
 const cfgExp = () => {
   const imp = impN() ? `${impN()} leitura(s) transcrita(s) de folha de campo manuscrita e conferida(s) pelo operador.` : '';
   if (!casoOn() && !imp) return state.cfg;
@@ -784,7 +794,7 @@ function estimarPendentes(forcar){
 }
 const gEst = m => p => p.lux != null ? p.lux : (m.get(p.id) ?? null);
 const fmtEst = (p, v) => fmt(v, unid(p) === 'cd/m²' ? 2 : 1);
-const valCel = (p, m) => p.lux == null && p.foto ? `<td class="n" style="color:var(--warn)">conferir foto</td>` : p.lux != null ? `<td class="n">${fmtVal(p)} ${unid(p)}</td>`
+const valCel = (p, m) => p.lux == null && p.foto ? `<td class="n" style="color:var(--warn)">${p.sug != null ? fmt(p.sug, unid(p) === 'cd/m²' ? 2 : 1) + ' (sugerido)' : 'conferir foto'}</td>` : p.lux != null ? `<td class="n">${fmtVal(p)} ${unid(p)}</td>`
   : m.has(p.id) ? `<td class="n">${fmtEst(p, m.get(p.id))} ${unid(p)}</td>` : `<td class="n">—</td>`;
 function estBloco(a, ae){
   const nEst = ae.st.n - a.st.n;
@@ -1479,11 +1489,12 @@ function abrir(i){
   $('luxLbl').textContent = lum ? 'Luminância lida no luminancímetro (cd/m²)' : 'Iluminância lida no luxímetro (lx)';
   $('lux').placeholder = lum ? '0,00' : '0,0';
   try { $('luxAutoBox').hidden = lum; if (!LA.conf || LA.conf.id !== p.id) LA.conf = null; } catch (e) {}
-  $('lux').value = p.lux == null ? '' : String(p.lux).replace('.', ',') + ' ' + unid(p);
+  $('lux').value = p.lux == null ? (p.sug != null ? String(p.sug).replace('.', ',') + ' ' + unid(p) : '') : String(p.lux).replace('.', ',') + ' ' + unid(p);
   $('camNote').textContent = podeLive ? '' : '“Tirar foto” abre a câmera nativa do celular e funciona mesmo com o arquivo aberto direto do aparelho.';
   $('luxErr').hidden = true;
   $('btnApagar').hidden = p.lux == null && !p.foto;
   $('dicaConf').hidden = !(p.lux == null && p.foto);
+  $('dicaConf').textContent = p.sug != null ? `Valor sugerido pela leitura automática da foto (${p.sugOrig === 'ia' ? 'IA' : 'leitura local'}). Confira no visor da foto e confirme ou corrija.` : 'Só a foto foi salva. Leia o valor do visor na foto (toque na foto para ampliar) e digite acima.';
   if (!manterCam) pararCamera();
   mostrarFoto(p.foto);
   $('modal').hidden = false;
@@ -1516,7 +1527,7 @@ async function salvarPonto(irProx){
   const p0 = state.pontos[sel], temFoto = fotoTemp !== undefined ? !!fotoTemp : !!p0.foto;
   if (raw === '' && temFoto && p0.lux == null) {          // só a foto: o valor é conferido depois no escritório
     const idx = sel; p0.hora = new Date().toISOString();
-    if (fotoTemp !== undefined) { p0.foto = fotoTemp; fotoPut(p0.id, fotoTemp); }
+    if (fotoTemp !== undefined) { p0.foto = fotoTemp; fotoPut(p0.id, fotoTemp); delete p0.sug; delete p0.sugOrig; }
     const prox = irProx ? proximoPendente(idx) : null;
     fechar(); renderTudo();
     if (irProx) { if (prox != null) abrir(prox); else toast(modoConf ? 'Todas as fotos foram conferidas.' : 'Nenhum ponto sem foto.'); }
@@ -1528,6 +1539,7 @@ async function salvarPonto(irProx){
   }
   const p = state.pontos[sel], idx = sel;
   p.lux = Math.round(v*1000)/1000; p.hora = new Date().toISOString(); delete p.auto; delete p.imp;
+  if (p.sug != null) { if (Math.abs(p.sug - p.lux) < 1e-9) p.lidoPor = p.sugOrig; else delete p.lidoPor; delete p.sug; delete p.sugOrig; } else delete p.lidoPor;
   if (LA.conf && LA.conf.id === p.id && Math.abs(LA.conf.v - v) < 1e-9) p.ocr = true; else delete p.ocr;
   if (fotoTemp !== undefined) { p.foto = fotoTemp; fotoPut(p.id, fotoTemp); }
   const prox = irProx ? proximoPendente(idx) : null;
@@ -1540,7 +1552,7 @@ async function apagarPonto(){
   if (sel == null) return;
   const p = state.pontos[sel];
   if (!(await confirmar(`Apagar ${p.lux == null ? 'a foto' : 'a medição'} do ponto ${nro(p)}?`, 'Apagar', 'danger'))) return;
-  p.lux = null; p.foto = null; p.hora = null; delete p.auto; delete p.imp; delete p.ocr; fotoPut(p.id, null);
+  p.lux = null; p.foto = null; p.hora = null; delete p.auto; delete p.imp; delete p.ocr; delete p.sug; delete p.sugOrig; delete p.lidoPor; fotoPut(p.id, null);
   fechar(); renderTudo(); await salvar(); renderLevs();
 }
 
@@ -1657,7 +1669,7 @@ function exportarCSV(){
   const rows = [['Município','Via','Data','Responsável','Instrumento','Nº','Área','Classe','Grupo','Longitudinal_m','Transversal_m','Valor','Unidade','Foto','Situação','Hora','Observações'].concat(state.estOn ? ['Valor_estimado'] : [], casoOn() || impN() || ocrN() ? ['Origem'] : [])];
   state.pontos.forEach(p => rows.push([c.municipio, c.via, c.data, c.resp, c.luximetro, nro(p), p.kind==='via'?'Via':'Passeio',
     p.kind==='via'?c.classeC:c.classeP, grupoNome(p), n(p.long,2), n(p.trans,2), n(p.lux,3), unid(p), p.foto?'Sim':'Não', p.lux != null ? 'Medido' : p.foto ? 'Só foto - conferir valor' : 'Pendente',
-    p.hora ? new Date(p.hora).toLocaleString('pt-BR') : '', c.obs || ''].concat(state.estOn ? [p.lux == null && em.has(p.id) ? n(em.get(p.id), 3) : ''] : [], casoOn() || impN() || ocrN() ? [p.auto ? 'ilustrativo' : p.imp ? 'folha de campo' : p.ocr ? 'visor lido pela câmera (conferido)' : p.lux != null ? 'medido' : ''] : [])));
+    p.hora ? new Date(p.hora).toLocaleString('pt-BR') : '', c.obs || ''].concat(state.estOn ? [p.lux == null && em.has(p.id) ? n(em.get(p.id), 3) : ''] : [], casoOn() || impN() || ocrN() ? [p.auto ? 'ilustrativo' : p.imp ? 'folha de campo' : p.lidoPor === 'ia' ? 'foto lida por IA (conferida)' : p.lidoPor === 'local' ? 'foto lida por OCR local (conferida)' : p.ocr ? 'visor lido pela câmera (conferido)' : p.lux != null ? 'medido' : ''] : [])));
   baixar(new Blob(['﻿' + rows.map(r => r.map(q).join(';')).join('\r\n')], {type:'text/csv;charset=utf-8'}), baseNome()+'.csv');
 }
 function exportarRelatorio(){
@@ -2729,7 +2741,7 @@ $('btnLimpar').onclick = async () => {
   const med = nMed();
   if (!med) { toast('Nenhuma medição para limpar.'); return; }
   if (!(await confirmar(`Apagar ${med} medição(ões) e fotos deste levantamento?`, 'Apagar', 'danger'))) return;
-  state.pontos.forEach(p => { p.lux = null; p.foto = null; p.hora = null; delete p.auto; delete p.imp; delete p.ocr; }); state.exemplo = false;
+  state.pontos.forEach(p => { p.lux = null; p.foto = null; p.hora = null; delete p.auto; delete p.imp; delete p.ocr; delete p.sug; delete p.sugOrig; delete p.lidoPor; }); state.exemplo = false;
   await fotosApagarLev(state.id); renderTudo(); await salvar(); renderLevs();
 };
 document.querySelectorAll('input[name=calc]').forEach(r => r.onchange = () => { syncCalcUI(); checarDirty(); });
@@ -2824,6 +2836,66 @@ $('btnPacote').onclick = async () => {
   } catch(e) { _cap = null; toast('Não foi possível montar o pacote: ' + (e && e.message ? e.message : e), 7000); }
   finally { b.disabled = false; b.textContent = t0; }
 };
+
+
+/* ---------- Leitura das fotos no escritório (em lote) ----------
+   Gera uma SUGESTÃO de valor (p.sug) para cada ponto com foto e sem valor. A sugestão não entra na conformidade:
+   só vira medição quando o usuário confere a foto e confirma em "Conferir fotos". */
+document.head.insertAdjacentHTML('beforeend', '<style>.lf{margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:12px}</style>');
+const LF_PROMPT = 'Esta é a foto do display de um luxímetro digital. Leia o valor numérico principal mostrado (a linha de dígitos maiores; ignore temperatura, HOLD, MAX/MIN e a unidade). Responda SOMENTE neste formato, sem mais nada: VALOR=<número com ponto decimal> UNIDADE=<lx|klx|fc|?>. Se algum dígito estiver ilegível, cortado ou ambíguo, responda VALOR=?. Não estime nem complete dígitos.';
+let lfRodando = false, lfParar = false;
+function lfImagem(p){   // foto carimbada -> imagem sem a barra de legenda
+  return new Promise((ok, er) => { const im = new Image(); im.onload = () => {
+    const W = im.naturalWidth, fs = Math.max(14, Math.round(W * .026)), bar = Math.round(fs * 2.9), H = Math.max(10, im.naturalHeight - bar);
+    const c = document.createElement('canvas'); c.width = W; c.height = H; c.getContext('2d').drawImage(im, 0, 0, W, H, 0, 0, W, H); ok(c); };
+    im.onerror = () => er(new Error('foto ilegível')); im.src = p.foto; });
+}
+async function lfIA(canvas, key, modelo){
+  const data = canvas.toDataURL('image/jpeg', .9).split(',')[1], ctrl = new AbortController(), to = setTimeout(() => ctrl.abort(), 60000);
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {method:'POST', signal:ctrl.signal,
+      headers:{'content-type':'application/json', 'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:modelo, max_tokens:100, messages:[{role:'user', content:[{type:'image', source:{type:'base64', media_type:'image/jpeg', data}}, {type:'text', text:LF_PROMPT}]}]})});
+    const j = await r.json().catch(() => null);
+    if (!r.ok) throw new Error((j && j.error && j.error.message) || ('HTTP ' + r.status));
+    const t = ((j && j.content) || []).filter(x => x.type === 'text').map(x => x.text).join(' ');
+    const m = /VALOR\s*=\s*(\d+(?:[.,]\d+)?)/i.exec(t), u = /UNIDADE\s*=\s*([a-z?]+)/i.exec(t);
+    if (!m) return null;
+    let v = parseFloat(m[1].replace(',', '.')); const un = u ? u[1].toLowerCase() : '?';
+    if (un === 'fc') return null; if (un === 'klx') v *= 1000;
+    return isFinite(v) ? v : null;
+  } finally { clearTimeout(to); }
+}
+async function lfLocal(canvas){
+  let r = laLerGirando(canvas);
+  if (r.valor == null) { const a = await laProcurar(canvas, () => {}, () => true); if (a) r = a.r; }
+  return r.valor != null ? r.valor : null;
+}
+async function lerLote(){
+  if (lfRodando) { lfParar = true; return; }
+  const alvo = state.pontos.filter(p => p.foto && p.lux == null && p.sug == null);
+  if (!alvo.length) { toast('Nenhuma foto sem valor para ler.'); return; }
+  const modo = $('lfModo').value, key = $('lfKey').value.trim(), modelo = $('impModelo').value.trim() || 'claude-sonnet-5-5';
+  if (modo === 'ia' && !key) { toast('Informe a chave de API para a leitura por IA.'); $('lfKey').focus(); return; }
+  if (modo === 'ia') { try { localStorage.setItem(LS_KEY, key); } catch (e) {} }
+  lfRodando = true; lfParar = false; const b = $('lfIr'); b.textContent = 'Parar leitura';
+  let ok = 0, falha = 0, i = 0, recusada = false;
+  try {
+    for (const p of alvo) {
+      if (lfParar) break; i++; $('lfSt').textContent = `Lendo o ponto ${nro(p)} (${i}/${alvo.length})…`;
+      try {
+        const c = await lfImagem(p), v = modo === 'ia' ? await lfIA(c, key, modelo) : await lfLocal(c);
+        if (v != null && v >= 0 && v <= 200000) { p.sug = Math.round(v * 1000) / 1000; p.sugOrig = modo; ok++; } else falha++;
+      } catch (e) { falha++; if (/401|x-api-key|authentication/i.test(String(e && e.message))) { recusada = true; break; } }
+      if (i % 5 === 0) { await salvar({semArquivo:true}); renderTabela(); }
+    }
+  } finally { lfRodando = false; b.textContent = 'Ler valores das fotos'; await salvar({semArquivo:true}); renderTudo(); }
+  $('lfSt').textContent = recusada ? 'A chave de API foi recusada. Confira a chave e tente de novo.'
+    : `${ok} leitura(s) sugerida(s), ${falha} sem leitura${lfParar ? ' (interrompido)' : ''}. Toque em “Conferir fotos” para confirmar cada valor.`;
+}
+$('lfIr').onclick = lerLote;
+$('lfModo').onchange = () => { $('lfKeyWrap').hidden = $('lfModo').value !== 'ia'; };
+try { $('lfKey').value = localStorage.getItem(LS_KEY) || ''; } catch (e) {}
 
 restaurar().catch(e => { mostrarFalha(e && e.message || String(e)); if (!state.id) gerar(true, true); });
 </script>
