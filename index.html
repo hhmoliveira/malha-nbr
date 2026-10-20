@@ -382,6 +382,7 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
       <input id="inGal" type="file" accept="image/*" hidden>
       <button class="btn ghost" id="btnLive" hidden>Câmera ao vivo</button>
       <button class="btn accent" id="btnSnap" hidden>Capturar</button>
+      <label class="btn ghost small" id="autoWrap" hidden style="gap:8px"><input type="checkbox" id="autoNext" style="width:auto;min-height:0"> Capturar e ir ao próximo ponto</label>
       <button class="btn danger small" id="btnTiraFoto" hidden>Remover foto</button>
     </div>
     <p class="note" id="camNote"></p>
@@ -1483,15 +1484,16 @@ function abrir(i){
   $('luxErr').hidden = true;
   $('btnApagar').hidden = p.lux == null && !p.foto;
   $('dicaConf').hidden = !(p.lux == null && p.foto);
-  pararCamera();
+  if (!manterCam) pararCamera();
   mostrarFoto(p.foto);
   $('modal').hidden = false;
   document.body.style.overflow = 'hidden';
   renderMalha();
   setTimeout(() => { if (!matchMedia('(pointer:coarse)').matches) $('lux').focus(); }, 50);
 }
+let manterCam = false;   // câmera ao vivo continua aberta ao pular para o próximo ponto
 function fechar(){
-  pararCamera(); $('modal').hidden = true; document.body.style.overflow = '';
+  if (!manterCam) pararCamera(); $('modal').hidden = true; document.body.style.overflow = '';
   sel = null; renderMalha();
 }
 function mostrarFoto(src){
@@ -1599,15 +1601,28 @@ async function laAutoPreencher(src){
 }
 function lerArquivoFoto(file){
   if (!file) return;
+  if (window.createImageBitmap) {   // reduz na leitura: evita decodificar a foto inteira do celular (48 MP) e fechar o navegador
+    createImageBitmap(file, {resizeWidth:1600, resizeQuality:'medium'}).then(b => {
+      fotoTemp = carimbar(b, b.width, b.height); mostrarFoto(fotoTemp);
+      laAutoPreencher(b).finally(() => { try { b.close(); } catch (e) {} });
+    }).catch(() => lerArquivoFotoImg(file));
+    return;
+  }
+  lerArquivoFotoImg(file);
+}
+function lerArquivoFotoImg(file){
   const url = URL.createObjectURL(file), img = new Image();
   img.onload = () => { fotoTemp = carimbar(img, img.naturalWidth, img.naturalHeight); mostrarFoto(fotoTemp); laAutoPreencher(img).finally(() => URL.revokeObjectURL(url)); };
   img.onerror = () => { URL.revokeObjectURL(url); toast('Não foi possível ler esta imagem.'); };
   img.src = url;
 }
 const podeLive = !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+$('autoWrap').hidden = !podeLive;
+try { $('autoNext').checked = localStorage.getItem('malhaNBR5101.autoNext') !== '0'; } catch (e) { $('autoNext').checked = true; }
+$('autoNext').onchange = () => { try { localStorage.setItem('malhaNBR5101.autoNext', $('autoNext').checked ? '1' : '0'); } catch (e) {} };
 async function iniciarCamera(){
   try {
-    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}, width:{ideal:1920}}, audio:false});
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}, width:{ideal:1280}}, audio:false});
     const v = $('video'); v.srcObject = stream; v.hidden = false; $('preview').hidden = true; $('fotoVazia').hidden = true;
     $('btnSnap').hidden = false; $('btnLive').textContent = 'Fechar câmera';
   } catch(e) { toast('A câmera ao vivo foi bloqueada. Use “Tirar foto”.'); pararCamera(); }
@@ -1619,8 +1634,18 @@ function pararCamera(){
   $('btnSnap').hidden = true; $('btnLive').textContent = 'Câmera ao vivo';
   if (!$('modal').hidden) mostrarFoto(fotoTemp !== undefined ? fotoTemp : (sel != null ? state.pontos[sel].foto : null));
 }
-function capturar(){
+async function capturar(){
   const v = $('video'); if (!v.videoWidth) return;
+  if ($('autoNext').checked && sel != null) {   // modo rápido: salva a foto no ponto, vai ao próximo e mantém a câmera aberta
+    const n = nro(state.pontos[sel]);
+    fotoTemp = carimbar(v, v.videoWidth, v.videoHeight);
+    try { navigator.vibrate && navigator.vibrate(40); } catch (e) {}
+    manterCam = true;
+    try { await salvarPonto(true); } finally { manterCam = false; }
+    if ($('modal').hidden) pararCamera();
+    else if (sel != null) toast(`✓ Ponto ${n} salvo · agora o ponto ${nro(state.pontos[sel])}`, 1600);
+    return;
+  }
   const quadro = laSnapshot(v);
   fotoTemp = carimbar(v, v.videoWidth, v.videoHeight); pararCamera(); mostrarFoto(fotoTemp); laAutoPreencher(quadro);
 }
