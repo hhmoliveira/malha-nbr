@@ -131,6 +131,8 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--surface-2)}
 .icon-btn{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;width:44px;height:44px;cursor:pointer;font-size:1.1rem}
 .foto-box{margin-top:12px;border-radius:8px;overflow:hidden;background:var(--surface-2);border:1px dashed var(--line)}
 .foto-box img,.foto-box video{display:block;width:100%;max-height:46vh;object-fit:contain;background:#000}
+.foto-box img.zoom{max-height:none}
+.dica{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:.85rem;font-weight:600;margin-top:8px}
 .foto-vazia{padding:22px 14px;text-align:center;color:var(--muted);font-size:.86rem}
 .lux-in{font:700 1.6rem var(--f-num);text-align:center;min-height:58px;margin-top:4px}
 .err{color:var(--bad);font-size:.85rem;font-weight:600;margin-top:6px}
@@ -161,6 +163,7 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
   <div class="bar" aria-hidden="true"><i id="pgBar"></i></div>
   <span class="saved" id="pgSaved"></span>
   <button class="btn primary small" id="btnProx">Medir próximo pendente</button>
+  <button class="btn accent small" id="btnConf" hidden>Conferir fotos</button>
 </div>
 
 <main>
@@ -297,6 +300,7 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
       <option value="todos">Todos os pontos</option>
       <option value="pend">Pendentes</option>
       <option value="med">Medidos</option>
+      <option value="conf">Só foto (conferir valor)</option>
     </select>
     <span class="note" id="filtroInfo" style="margin:0"></span>
     <button class="btn ghost small" id="btnImp" type="button">Importar folha de campo</button>
@@ -311,6 +315,7 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
     <button class="btn primary" id="btnRel">Exportar relatório (HTML com fotos)</button>
     <button class="btn accent" id="btnPdf">Exportar PDF</button>
     <button class="btn ghost" id="btnCsv">Exportar CSV</button>
+    <button class="btn primary" id="btnPacote">Exportar pasta completa (.zip)</button>
   </div>
   <p class="note">O CSV abre direto no Excel (separador “;” e vírgula decimal). Para guardar ou continuar o trabalho em outro aparelho, use “Salvar arquivo no aparelho”.</p>
 </section>
@@ -417,6 +422,7 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
       <label for="lux" class="fld-lbl" id="luxLbl">Iluminância lida no luxímetro (lx)</label>
       <input id="lux" class="lux-in" inputmode="decimal" autocomplete="off" placeholder="0,0 lx">
       <div class="err" id="luxErr" hidden></div>
+      <div class="dica" id="dicaConf" hidden>Só a foto foi salva. Leia o valor do visor na foto (toque na foto para ampliar) e digite acima.</div>
     </div>
     <div class="actions">
       <button class="btn primary" id="btnSalvarProx">Salvar e ir ao próximo</button>
@@ -753,7 +759,7 @@ function estimarPendentes(forcar){
     const tr = [...new Set(arr.map(p => r6(p.trans)))].sort((a,b) => a-b);
     const cel = new Map(arr.map(p => [lo.indexOf(r6(p.long)) + ',' + tr.indexOf(r6(p.trans)), p]));
     for (const p of arr) {
-      if (p.lux != null) continue;
+      if (p.lux != null || p.foto) continue;
       const i = lo.indexOf(r6(p.long)), j = tr.indexOf(r6(p.trans));
       const viz = (raio, diag) => {
         const o = [];
@@ -777,7 +783,7 @@ function estimarPendentes(forcar){
 }
 const gEst = m => p => p.lux != null ? p.lux : (m.get(p.id) ?? null);
 const fmtEst = (p, v) => fmt(v, unid(p) === 'cd/m²' ? 2 : 1);
-const valCel = (p, m) => p.lux != null ? `<td class="n">${fmtVal(p)} ${unid(p)}</td>`
+const valCel = (p, m) => p.lux == null && p.foto ? `<td class="n" style="color:var(--warn)">conferir foto</td>` : p.lux != null ? `<td class="n">${fmtVal(p)} ${unid(p)}</td>`
   : m.has(p.id) ? `<td class="n">${fmtEst(p, m.get(p.id))} ${unid(p)}</td>` : `<td class="n">—</td>`;
 function estBloco(a, ae){
   const nEst = ae.st.n - a.st.n;
@@ -897,7 +903,7 @@ function renderResumo(){
 /* ---------- Tabela ---------- */
 function renderTabela(){
   const f = $('filtro').value, tb = $('tbody'), em = estimarPendentes();
-  const lista = state.pontos.map((p,i)=>[p,i]).filter(([p]) => f==='todos' || (f==='med') === (p.lux != null));
+  const lista = state.pontos.map((p,i)=>[p,i]).filter(([p]) => f==='todos' || (f==='conf' ? (p.lux == null && !!p.foto) : (f==='med') === (p.lux != null)));
   tb.innerHTML = lista.map(([p,i]) => `<tr data-i="${i}">
     <td class="no">${nro(p)}</td>
     <td><span class="tag" style="background:var(${p.lux!=null?'--ok':p.kind==='via'?'--via':'--ped'})"></span>${esc(areaNome(p))}</td>
@@ -912,7 +918,9 @@ function renderTabela(){
 
 function renderProgresso(){
   const tot = state.pontos.length, med = nMed();
-  $('pgCount').textContent = `${med} / ${tot} medidos`;
+  const nf = state.pontos.filter(p => p.lux == null && p.foto).length;
+  $('pgCount').textContent = `${med} / ${tot} medidos` + (nf ? ` · ${nf} só foto` : '');
+  $('btnConf').hidden = !nf; $('btnConf').textContent = `Conferir fotos (${nf})`;
   $('pgBar').style.width = tot ? (100*med/tot)+'%' : '0';
   $('btnProx').textContent = med === tot && tot ? 'Malha completa' : 'Medir próximo pendente';
   $('btnProx').disabled = med === tot;
@@ -1034,7 +1042,9 @@ function jsonTexto(){
     id:state.id, criado:state.criado, cfg:state.cfg, estOn:!!state.estOn, exemplo:!!state.exemplo, pontos:state.pontos}, null, 1);
 }
 const baseNome = () => `malha_${slug(state.cfg.municipio)}_${slug(state.cfg.via)}_${state.cfg.classeC}${ladosDe(state.cfg.calc).length?'_'+state.cfg.classeP:''}${casoOn()?'_estudo_de_caso':''}`;
+let _cap = null;   // quando ativo, os exports são recolhidos para o pacote .zip em vez de baixados
 function baixar(blob, nome){
+  if (_cap) { _cap.push([nome, blob]); return; }
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
@@ -1471,7 +1481,8 @@ function abrir(i){
   $('lux').value = p.lux == null ? '' : String(p.lux).replace('.', ',') + ' ' + unid(p);
   $('camNote').textContent = podeLive ? '' : '“Tirar foto” abre a câmera nativa do celular e funciona mesmo com o arquivo aberto direto do aparelho.';
   $('luxErr').hidden = true;
-  $('btnApagar').hidden = p.lux == null;
+  $('btnApagar').hidden = p.lux == null && !p.foto;
+  $('dicaConf').hidden = !(p.lux == null && p.foto);
   pararCamera();
   mostrarFoto(p.foto);
   $('modal').hidden = false;
@@ -1488,9 +1499,11 @@ function mostrarFoto(src){
   $('fotoVazia').hidden = !!src || !$('video').hidden;
   $('btnTiraFoto').hidden = !src;
 }
+let modoConf = false;
 function proximoPendente(from){
-  const n = state.pontos.length;
-  for (let k=1; k<=n; k++) { const i = ((from ?? -1) + k) % n; if (state.pontos[i].lux == null) return i; }
+  const n = state.pontos.length, ok = modoConf ? (p => p.lux == null && p.foto) : (p => p.lux == null && !p.foto);
+  for (let k=1; k<=n; k++) { const i = ((from ?? -1) + k) % n; if (ok(state.pontos[i])) return i; }
+  if (!modoConf) for (let k=1; k<=n; k++) { const i = ((from ?? -1) + k) % n; if (state.pontos[i].lux == null) return i; }
   return null;
 }
 /* valor do campo: aceita "12,4", "12,4 lx" ou "12,4lx"; a unidade é a do ponto (lx, ou cd/m² na via classe M) */
@@ -1498,8 +1511,18 @@ const luxDoCampo = t => { const m = String(t).trim().replace(/\s*(lx|lux|cd\/m²
 async function salvarPonto(irProx){
   if (sel == null) return;
   const raw = $('lux').value.trim(), v = luxDoCampo(raw);
+  const p0 = state.pontos[sel], temFoto = fotoTemp !== undefined ? !!fotoTemp : !!p0.foto;
+  if (raw === '' && temFoto && p0.lux == null) {          // só a foto: o valor é conferido depois no escritório
+    const idx = sel; p0.hora = new Date().toISOString();
+    if (fotoTemp !== undefined) { p0.foto = fotoTemp; fotoPut(p0.id, fotoTemp); }
+    const prox = irProx ? proximoPendente(idx) : null;
+    fechar(); renderTudo();
+    if (irProx) { if (prox != null) abrir(prox); else toast(modoConf ? 'Todas as fotos foram conferidas.' : 'Nenhum ponto sem foto.'); }
+    else toast(`Ponto ${nro(p0)}: foto salva, valor a conferir.`);
+    await salvar({medicao:true}); renderLevs(); return;
+  }
   if (raw === '' || !isFinite(v) || v < 0 || v > 200000) {
-    $('luxErr').textContent = `Digite a leitura do instrumento (ex.: 12,4 ${unid(state.pontos[sel])}).`; $('luxErr').hidden = false; $('lux').focus(); return;
+    $('luxErr').textContent = `Digite a leitura do instrumento (ex.: 12,4 ${unid(state.pontos[sel])}) ou tire a foto do visor e salve só a foto.`; $('luxErr').hidden = false; $('lux').focus(); return;
   }
   const p = state.pontos[sel], idx = sel;
   p.lux = Math.round(v*1000)/1000; p.hora = new Date().toISOString(); delete p.auto; delete p.imp;
@@ -1514,7 +1537,7 @@ async function salvarPonto(irProx){
 async function apagarPonto(){
   if (sel == null) return;
   const p = state.pontos[sel];
-  if (!(await confirmar(`Apagar a medição do ponto ${nro(p)}?`, 'Apagar', 'danger'))) return;
+  if (!(await confirmar(`Apagar ${p.lux == null ? 'a foto' : 'a medição'} do ponto ${nro(p)}?`, 'Apagar', 'danger'))) return;
   p.lux = null; p.foto = null; p.hora = null; delete p.auto; delete p.imp; delete p.ocr; fotoPut(p.id, null);
   fechar(); renderTudo(); await salvar(); renderLevs();
 }
@@ -1606,9 +1629,9 @@ function capturar(){
 function exportarCSV(){
   const em = estimarPendentes(), c = cfgExp(), q = x => '"' + String(x ?? '').replace(/"/g,'""') + '"';
   const n = (x,d) => x == null ? '' : Number(x).toFixed(d).replace('.', ',');
-  const rows = [['Município','Via','Data','Responsável','Instrumento','Nº','Área','Classe','Grupo','Longitudinal_m','Transversal_m','Valor','Unidade','Foto','Hora','Observações'].concat(state.estOn ? ['Valor_estimado'] : [], casoOn() || impN() || ocrN() ? ['Origem'] : [])];
+  const rows = [['Município','Via','Data','Responsável','Instrumento','Nº','Área','Classe','Grupo','Longitudinal_m','Transversal_m','Valor','Unidade','Foto','Situação','Hora','Observações'].concat(state.estOn ? ['Valor_estimado'] : [], casoOn() || impN() || ocrN() ? ['Origem'] : [])];
   state.pontos.forEach(p => rows.push([c.municipio, c.via, c.data, c.resp, c.luximetro, nro(p), p.kind==='via'?'Via':'Passeio',
-    p.kind==='via'?c.classeC:c.classeP, grupoNome(p), n(p.long,2), n(p.trans,2), n(p.lux,3), unid(p), p.foto?'Sim':'Não',
+    p.kind==='via'?c.classeC:c.classeP, grupoNome(p), n(p.long,2), n(p.trans,2), n(p.lux,3), unid(p), p.foto?'Sim':'Não', p.lux != null ? 'Medido' : p.foto ? 'Só foto - conferir valor' : 'Pendente',
     p.hora ? new Date(p.hora).toLocaleString('pt-BR') : '', c.obs || ''].concat(state.estOn ? [p.lux == null && em.has(p.id) ? n(em.get(p.id), 3) : ''] : [], casoOn() || impN() || ocrN() ? [p.auto ? 'ilustrativo' : p.imp ? 'folha de campo' : p.ocr ? 'visor lido pela câmera (conferido)' : p.lux != null ? 'medido' : ''] : [])));
   baixar(new Blob(['﻿' + rows.map(r => r.map(q).join(';')).join('\r\n')], {type:'text/csv;charset=utf-8'}), baseNome()+'.csv');
 }
@@ -1646,7 +1669,7 @@ ${casoOn() ? `<div class="metodo" style="border-color:var(--bad)"><b>ESTUDO DE C
 ${c.obs ? `<h2>Observações</h2><p style="white-space:pre-wrap">${esc(c.obs)}</p>` : ''}
 <h2>Registros</h2><table><tr><th>Nº</th><th>Área</th><th>Grupo</th><th>Long. (m)</th><th>Transv. (m)</th><th>Valor</th><th>Foto</th><th>Hora</th></tr>
 ${state.pontos.map(p=>`<tr><td><b>${nro(p)}</b></td><td>${esc(areaNome(p))}</td><td>${grupoNome(p)}</td><td class="n">${fmt(p.long)}</td><td class="n">${fmt(p.trans)}</td>${valCel(p, em)}<td>${p.foto?'Sim':'—'}</td><td>${p.hora?hhmm(p.hora):'—'}</td></tr>`).join('')}</table>
-${fotos.length?`<h2>Registro fotográfico (${fotos.length})</h2><div class="fotos">${fotos.map(p=>`<figure><img src="${p.foto}" alt="Ponto ${nro(p)}"><figcaption><b>Ponto ${nro(p)}</b> · ${esc(grupoNome(p))} · ${p.lux==null?'—':fmtVal(p)+' '+unid(p)}</figcaption></figure>`).join('')}</div>`:''}
+${fotos.length?`<h2>Registro fotográfico (${fotos.length})</h2><div class="fotos">${fotos.map(p=>`<figure><img src="${p.foto}" alt="Ponto ${nro(p)}"><figcaption><b>Ponto ${nro(p)}</b> · ${esc(grupoNome(p))} · ${p.lux==null?'valor a conferir':fmtVal(p)+' '+unid(p)}</figcaption></figure>`).join('')}</div>`:''}
 </body></html>`;
   baixar(new Blob([html], {type:'text/html;charset=utf-8'}), 'relatorio_' + baseNome() + '.html');
 }
@@ -1890,7 +1913,7 @@ async function montarPDF(){
   ensure(34);
   doc.texto('Registro dos pontos', M, y + 9, {size:9, bold:true, color:K.muted}); y += 12;
   tabela([{t:'Nº', w:34}, {t:'Área', w:82}, {t:'Grupo', w:76}, {t:'Long. (m)', w:60, a:'r'}, {t:'Transv. (m)', w:62, a:'r'}, {t:'Valor', w:117, a:'r'}, {t:'Hora', w:50, a:'r'}, {t:'Foto', w:37, a:'r'}],
-    state.pontos.map(p => [{t:String(nro(p)), b:true}, areaNome(p), grupoNome(p), fmt(p.long), fmt(p.trans), p.lux == null ? (emP.has(p.id) ? fmtEst(p, emP.get(p.id)) + ' ' + unid(p) : '—') : fmtVal(p) + ' ' + unid(p), p.hora ? hhmm(p.hora) : '—', p.foto ? 'Sim' : '—']));
+    state.pontos.map(p => [{t:String(nro(p)), b:true}, areaNome(p), grupoNome(p), fmt(p.long), fmt(p.trans), p.lux == null ? (p.foto ? 'conferir foto' : emP.has(p.id) ? fmtEst(p, emP.get(p.id)) + ' ' + unid(p) : '—') : fmtVal(p) + ' ' + unid(p), p.hora ? hhmm(p.hora) : '—', p.foto ? 'Sim' : '—']));
 
   /* 4. Resumo de conformidade */
   secao(4, 'Resumo de conformidade');
@@ -1941,6 +1964,24 @@ async function montarPDF(){
   secao(6, 'Observações');
   if (!obs) { doc.texto('Nenhuma observação registrada.', M, y + 9, {size:9.5, color:K.muted}); y += 14; }
   else for (const ln of L) { ensure(13); doc.texto(ln, M, y + 9.5, {size:9.5}); y += 13; }
+
+  /* 7. Registro fotográfico: uma imagem por ponto, para conferir os valores no escritório */
+  const fp = state.pontos.filter(p => p.foto);
+  if (fp.length) {
+    nova(false); secao(7, `Registro fotográfico (${fp.length})`);
+    const cw = (doc.pw - 2 * M - 12) / 2; let col = 0, rowH = 0;
+    for (const p of fp) {
+      const b = atob(p.foto.split(',')[1]), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+      const im = new Image(); await new Promise((ok, er) => { im.onload = ok; im.onerror = () => er(new Error('foto do ponto ' + nro(p))); im.src = p.foto; });
+      const h = cw * im.naturalHeight / im.naturalWidth;
+      if (col === 0 && y + h + 24 > doc.ph - 48) { nova(false); y += 4; }
+      const x = M + col * (cw + 12);
+      doc.imagem(u, im.naturalWidth, im.naturalHeight, x, y, cw, h); doc.retangulo(x, y, cw, h, {stroke:K.line});
+      doc.texto(`Ponto ${nro(p)} · ${grupoNome(p)} · ${p.lux == null ? 'valor a conferir' : fmtVal(p) + ' ' + unid(p)}`, x, y + h + 11, {size:8.5, bold:true});
+      rowH = Math.max(rowH, h);
+      if (col === 1) { y += rowH + 22; rowH = 0; col = 0; } else col = 1;
+    }
+  }
 
   /* rodapé em todas as páginas */
   const n = doc.n;
@@ -2690,11 +2731,13 @@ $('cadEnd').onchange = () => { const v = $('cadEnd').value; if (v !== '') aplica
 $('btnCadRem').onclick = async () => {
   if (!(await confirmar('Remover o banco de dados deste aparelho? Os levantamentos não são afetados.', 'Remover', 'danger'))) return;
   cadastro = null; try { await tx('meta','readwrite', s => s.delete('cadastroVias')); } catch(e) {} renderCadastro(); };
-$('malha').addEventListener('click', e => { const g = e.target.closest('.pt'); if (g) abrir(+g.dataset.i); });
+$('malha').addEventListener('click', e => { const g = e.target.closest('.pt'); if (g) { modoConf = false; abrir(+g.dataset.i); } });
 $('malha').addEventListener('keydown', e => { const g = e.target.closest('.pt'); if (g && (e.key==='Enter'||e.key===' ')) { e.preventDefault(); abrir(+g.dataset.i); } });
-$('tbody').addEventListener('click', e => { const tr = e.target.closest('tr[data-i]'); if (tr) abrir(+tr.dataset.i); });
+$('tbody').addEventListener('click', e => { const tr = e.target.closest('tr[data-i]'); if (tr) { modoConf = false; abrir(+tr.dataset.i); } });
 $('filtro').onchange = renderTabela;
-$('btnProx').onclick = () => { const i = proximoPendente(-1); if (i != null) abrir(i); };
+$('btnProx').onclick = () => { modoConf = false; const i = proximoPendente(-1); if (i != null) abrir(i); };
+$('btnConf').onclick = () => { modoConf = true; const i = proximoPendente(-1); if (i != null) abrir(i); else modoConf = false; };
+$('preview').addEventListener('click', () => $('preview').classList.toggle('zoom'));
 $('btnFit').onclick = () => { fitMode = !fitMode; $('svgwrap').classList.toggle('fit', fitMode); $('btnFit').textContent = fitMode ? 'Tamanho real' : 'Ajustar à tela'; };
 $('mClose').onclick = fechar;
 $('modal').addEventListener('click', e => { if (e.target === $('modal')) fechar(); });
@@ -2716,6 +2759,46 @@ $('btnRel').onclick = exportarRelatorio;
 $('btnPdf').onclick = exportarPDF;
 $('inJson').onchange = e => { importarJSON(e.target.files[0]); e.target.value = ''; };
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && state.id) salvar({semArquivo:true}); });
+
+
+/* ---------- Pacote em pasta (.zip): CSV + relatório com fotos + .json + fotos/ponto_001.jpg ---------- */
+const _crcT = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = u => { let c = ~0; for (let i = 0; i < u.length; i++) c = _crcT[(c ^ u[i]) & 255] ^ (c >>> 8); return ~c >>> 0; };
+function zipar(arq){
+  const te = new TextEncoder(), parts = [], cen = []; let off = 0;
+  const dt = new Date(), dd = ((dt.getFullYear() - 1980) << 9) | ((dt.getMonth() + 1) << 5) | dt.getDate(), tt = (dt.getHours() << 11) | (dt.getMinutes() << 5) | (dt.getSeconds() >> 1);
+  for (const [nome, d] of arq) {
+    const nb = te.encode(nome), c = crc32(d), h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(10, tt, true); h.setUint16(12, dd, true);
+    h.setUint32(14, c, true); h.setUint32(18, d.length, true); h.setUint32(22, d.length, true); h.setUint16(26, nb.length, true);
+    parts.push(new Uint8Array(h.buffer), nb, d);
+    const e = new DataView(new ArrayBuffer(46));
+    e.setUint32(0, 0x02014b50, true); e.setUint16(4, 20, true); e.setUint16(6, 20, true); e.setUint16(8, 0x0800, true); e.setUint16(12, tt, true); e.setUint16(14, dd, true);
+    e.setUint32(16, c, true); e.setUint32(20, d.length, true); e.setUint32(24, d.length, true); e.setUint16(28, nb.length, true); e.setUint32(42, off, true);
+    cen.push(new Uint8Array(e.buffer), nb); off += 30 + nb.length + d.length;
+  }
+  const cs = cen.reduce((a, b) => a + b.length, 0), f = new DataView(new ArrayBuffer(22));
+  f.setUint32(0, 0x06054b50, true); f.setUint16(8, arq.length, true); f.setUint16(10, arq.length, true); f.setUint32(12, cs, true); f.setUint32(16, off, true);
+  return new Blob([...parts, ...cen, new Uint8Array(f.buffer)], {type:'application/zip'});
+}
+$('btnPacote').onclick = async () => {
+  if (!state.cfg) { toast('Nenhum levantamento aberto.'); return; }
+  const b = $('btnPacote'), t0 = b.textContent; b.disabled = true; b.textContent = 'Montando pasta…';
+  try {
+    const raiz = baseNome(), te = new TextEncoder(), arq = [];
+    _cap = []; try { exportarCSV(); exportarRelatorio(); } finally { var cap = _cap; _cap = null; }
+    for (const [n, bl] of cap) arq.push([raiz + '/' + n, new Uint8Array(await bl.arrayBuffer())]);
+    arq.push([raiz + '/' + raiz + '.json', te.encode(jsonTexto())]);
+    let nf = 0;
+    for (const p of state.pontos) if (p.foto) {
+      const bs = atob(p.foto.split(',')[1]), u = new Uint8Array(bs.length); for (let i = 0; i < bs.length; i++) u[i] = bs.charCodeAt(i);
+      arq.push([raiz + '/fotos/ponto_' + String(nro(p)).padStart(3, '0') + '.jpg', u]); nf++;
+    }
+    baixar(zipar(arq), raiz + '.zip');
+    toast(`Pacote salvo em Downloads: ${raiz}.zip (${nf} foto(s)). Extraia no app Meus Arquivos para criar a pasta.`, 7000);
+  } catch(e) { _cap = null; toast('Não foi possível montar o pacote: ' + (e && e.message ? e.message : e), 7000); }
+  finally { b.disabled = false; b.textContent = t0; }
+};
 
 restaurar().catch(e => { mostrarFalha(e && e.message || String(e)); if (!state.id) gerar(true, true); });
 </script>
