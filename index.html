@@ -6,7 +6,9 @@
 <meta name="theme-color" content="#0d4f83">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Malha NBR 5101">
 <title>Malha de Medição NBR 5101 (leve)</title>
@@ -164,7 +166,9 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
   <span class="saved" id="pgSaved"></span>
   <button class="btn primary small" id="btnProx">Medir próximo pendente</button>
   <button class="btn accent small" id="btnConf" hidden>Conferir fotos</button>
+  <button class="btn ghost small" id="btnInstalar" hidden>Instalar app</button>
   <label class="btn ghost small" style="gap:6px" title="Depois de cada foto, pula de 2 em 2 pontos: 1, 3, 5… e inclui o último"><input type="checkbox" id="altNext" style="width:auto;min-height:0"> Alternado (1, 3, 5…)</label>
+  <label class="btn ghost small" style="gap:6px" title="Numérica: segue a numeração (1, 2, 3…). Por coluna: percorre cada coluna de ponta a ponta da seção (passeio 1 → faixas → passeio 2), alternando o sentido a cada coluna (serpentina)."><span>Ordem:</span> <select id="ordemNext" style="width:auto;min-height:0;padding:4px 6px"><option value="num">Numérica</option><option value="col">Por coluna (serpentina)</option></select></label>
 </div>
 
 <main>
@@ -1483,7 +1487,9 @@ function abrir(i){
   $('mArea').textContent = `${areaNome(p)} · ${grupoNome(p)}`;
   $('mArea').style.color = p.kind === 'via' ? 'var(--via)' : 'var(--ped)';
   const lum = unid(p) === 'cd/m²';
+  const ci = colInfo(p), sentido = $('ordemNext').value === 'col' ? (ci.col % 2 ? ' · sentido: passeio 1 → passeio 2' : ' · sentido: passeio 2 → passeio 1') : '';
   $('mInfo').innerHTML = `<dt>Via</dt><dd style="text-align:left;font-family:var(--f-ui)">${esc(c.via)}</dd>
+    <dt>Coluna</dt><dd style="text-align:left;font-family:var(--f-ui)"><b>${ci.col}</b> de ${ci.N}${sentido}</dd>
     <dt>Longitudinal</dt><dd style="text-align:left">${fmt(p.long)} m da luminária inicial</dd>
     <dt>Transversal</dt><dd style="text-align:left">${fmt(p.trans)} m ${p.kind==='via'?'da borda da faixa':'do meio-fio'}</dd>
     ${lum ? `<dt>Observador</dt><dd style="text-align:left;font-family:var(--f-ui)">Centro da faixa, 1,5 m de altura, 60 m antes da área, no sentido do fluxo</dd>` : ''}`;
@@ -1514,13 +1520,36 @@ function mostrarFoto(src){
   $('btnTiraFoto').hidden = !src;
 }
 let modoConf = false;
+/* Coluna = posição longitudinal (1…N): todos os pontos com o mesmo "long", do passeio 1 ao passeio 2 */
+function colInfo(p){
+  const c = state.cfg, N = calcN(c.S), D = c.S / N;
+  const col = Math.min(N, Math.max(1, Math.round((p.long - D/2) / D) + 1));
+  return {col, N};
+}
+/* Ordem de visita (lista de índices de state.pontos):
+   'num' = numeração (1, 2, 3…); 'col' = por coluna em serpentina — coluna 1 de cima para baixo (passeio 1 → faixas → passeio 2),
+   coluna 2 de baixo para cima, e assim por diante. A regra de pontos alternados (ímpares + último) é aplicada depois, sobre esta ordem. */
+function ordemPontos(){
+  const n = state.pontos.length, idx = [...Array(n).keys()];
+  if (($('ordemNext') && $('ordemNext').value) !== 'col') return idx;
+  const g = p => p.kind === 'p' ? (p.g === 1 ? 0 : 1e6) : p.g;      // passeio 1 → faixas → passeio 2
+  const cols = new Map();
+  for (const i of idx) { const k = colInfo(state.pontos[i]).col; if (!cols.has(k)) cols.set(k, []); cols.get(k).push(i); }
+  const out = [];
+  [...cols.keys()].sort((a, b) => a - b).forEach((k, pos) => {
+    const l = cols.get(k).sort((a, b) => (g(state.pontos[a]) - g(state.pontos[b])) || (a - b));  // a - b: ordem de numeração dentro do grupo
+    out.push(...(pos % 2 ? l.reverse() : l));
+  });
+  return out;
+}
 function proximoPendente(from){
   const n = state.pontos.length, alt = $('altNext').checked && !modoConf;
   const ok = modoConf ? ((p, i) => p.lux == null && p.foto)
     : alt ? ((p, i) => p.lux == null && !p.foto && (nro(p) % 2 === 1 || i === n - 1))   // alternado: pontos ímpares + o último
     : ((p, i) => p.lux == null && !p.foto);
-  for (let k=1; k<=n; k++) { const i = ((from ?? -1) + k) % n; if (ok(state.pontos[i], i)) return i; }
-  if (!modoConf && !alt) for (let k=1; k<=n; k++) { const i = ((from ?? -1) + k) % n; if (state.pontos[i].lux == null) return i; }
+  const ord = ordemPontos(), pos0 = (from == null || from < 0) ? -1 : ord.indexOf(from);
+  for (let k=1; k<=n; k++) { const i = ord[(pos0 + k + n) % n]; if (ok(state.pontos[i], i)) return i; }
+  if (!modoConf && !alt) for (let k=1; k<=n; k++) { const i = ord[(pos0 + k + n) % n]; if (state.pontos[i].lux == null) return i; }
   return null;
 }
 /* valor do campo: aceita "12,4", "12,4 lx" ou "12,4lx"; a unidade é a do ponto (lx, ou cd/m² na via classe M) */
@@ -1636,6 +1665,8 @@ const podeLive = !!(window.isSecureContext && navigator.mediaDevices && navigato
 $('autoWrap').hidden = !podeLive;
 try { $('autoNext').checked = localStorage.getItem('malhaNBR5101.autoNext') !== '0'; } catch (e) { $('autoNext').checked = true; }
 try { $('altNext').checked = localStorage.getItem('malhaNBR5101.altNext') === '1'; } catch (e) {}
+try { const o = localStorage.getItem('malhaNBR5101.ordemNext'); if (o === 'col' || o === 'num') $('ordemNext').value = o; } catch (e) {}
+$('ordemNext').onchange = () => { try { localStorage.setItem('malhaNBR5101.ordemNext', $('ordemNext').value); } catch (e) {} };
 $('altNext').onchange = () => { try { localStorage.setItem('malhaNBR5101.altNext', $('altNext').checked ? '1' : '0'); } catch (e) {} };
 $('autoNext').onchange = () => { try { localStorage.setItem('malhaNBR5101.autoNext', $('autoNext').checked ? '1' : '0'); } catch (e) {} };
 async function iniciarCamera(){
@@ -2909,6 +2940,11 @@ restaurar().catch(e => { mostrarFalha(e && e.message || String(e)); if (!state.i
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
+/* Botão "Instalar app" (Chrome/Edge/Android); no iPhone: Compartilhar → Adicionar à Tela de Início */
+let _instalar = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); _instalar = e; const b = document.getElementById('btnInstalar'); if (b) b.hidden = false; });
+document.getElementById('btnInstalar').onclick = async () => { if (!_instalar) return; _instalar.prompt(); try { await _instalar.userChoice; } catch (_) {} _instalar = null; document.getElementById('btnInstalar').hidden = true; };
+window.addEventListener('appinstalled', () => { const b = document.getElementById('btnInstalar'); if (b) b.hidden = true; });
 </script>
 </body>
 </html>
