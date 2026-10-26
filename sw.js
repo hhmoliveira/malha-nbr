@@ -5,7 +5,7 @@
    - Biblioteca de planilhas (SheetJS, cdnjs): guardada na primeira vez que for usada com internet.
    - Chamadas à API (leitura por IA) e qualquer POST: nunca passam pelo cache.
    Para publicar uma versão nova, troque VERSAO: o app mostra "Nova versão disponível". */
-const VERSAO = 'malha5101-2026-10-26a';
+const VERSAO = 'malha5101-2026-10-26b';
 const NUCLEO = [
   './', './index.html', './manifest.json',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-192.png', './icons/maskable-512.png',

@@ -163,7 +163,7 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
 <div class="boot" id="boot">Carregando a ferramenta… Se esta mensagem não sumir, o aplicativo que abriu o arquivo não executa scripts. Abra o arquivo no Chrome (Android) ou no Safari (iPhone).</div>
 
 <div class="progress" aria-live="polite">
-  <span class="count" id="pgCount">0 / 0</span>
+  <span class="count" id="pgCount">0 / 0</span><span class="note" id="lfFundoChip" hidden style="margin:0 0 0 8px;font-weight:700;color:var(--brand)"></span>
   <div class="bar" aria-hidden="true"><i id="pgBar"></i></div>
   <span class="saved" id="pgSaved"></span>
   <button class="btn primary small" id="btnProx">Medir próximo pendente</button>
@@ -325,10 +325,16 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
     <button class="btn primary" id="btnPacote">Exportar pasta completa (.zip)</button>
   </div>
   <div class="lf">
-    <h3 style="margin-top:0">Leitura das fotos (escritório)</h3>
+    <h3 style="margin-top:0">Leitura das fotos</h3>
+    <div class="lf-campo">
+      <label class="lf-op"><input type="checkbox" id="lfFundoOn" checked> <span><b>Em campo: ler o visor em segundo plano</b> logo depois de cada foto salva (inclusive em “Capturar e ir ao próximo ponto”). O valor entra como <i>sugerido</i>, sem parar a câmera; você confere depois na grade.</span></label>
+      <label class="lf-op"><input type="checkbox" id="lfFundoIA"> <span>Quando a leitura local não conseguir, <b>enviar a foto à IA online</b> (precisa de internet e da chave de API abaixo; sem sinal, a foto espera na fila e vai quando a internet voltar).</span></label>
+      <p class="note" id="lfFundoSt" style="margin:4px 0 0"></p>
+    </div>
+    <h4 style="margin:14px 0 6px">No escritório (em lote)</h4>
     <div class="grid">
       <div class="fld"><label for="lfModo">Método</label><select id="lfModo"><option value="local">Leitura local do visor (sem internet)</option><option value="ia">IA online (chave de API)</option></select></div>
-      <div class="fld" id="lfKeyWrap"><label for="lfKey">Chave de API</label><input id="lfKey" type="password" autocomplete="off" placeholder="sk-ant-…"></div>
+      <div class="fld" id="lfKeyWrap"><label for="lfKey">Chave de API (IA online)</label><input id="lfKey" type="password" autocomplete="off" placeholder="sk-ant-…"></div>
     </div>
     <div class="actions"><button class="btn primary" id="lfIr">Ler valores das fotos</button><button class="btn ghost" id="lfGradeBtn" type="button">Conferir em grade</button></div>
     <p class="note" id="lfSt"></p>
@@ -412,7 +418,7 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
         <button class="btn danger big" id="laParar" type="button" hidden>Interromper leitura</button>
         <label class="btn ghost big" for="laFoto">Ler valor de uma foto</label><input id="laFoto" type="file" accept="image/*" capture="environment" hidden>
       </div>
-      <div class="la-mult"><label for="laMult">Multiplicador do visor</label><select id="laMult"><option value="1">×1 (sem multiplicador)</option><option value="10">×10 (visor mostra X10)</option><option value="100">×100 (visor mostra X100)</option></select><span class="note" style="margin:0">Se o visor mostrar “X10”, o valor gravado é o lido × 10 (ex.: 108,2 → 1.082 lx).</span></div>
+      <div class="la-mult"><label for="laMult">Multiplicador do visor</label><select id="laMult"><option value="auto">Automático (reconhece X10 no visor)</option><option value="1">×1 (sem multiplicador)</option><option value="10">×10 (visor mostra X10)</option><option value="100">×100 (visor mostra X100)</option></select><span class="note" style="margin:0">Se o visor mostrar “X10”, o valor gravado é o lido × 10 (ex.: 108,2 → 1.082 lx). No automático, o app procura o “X10” em cada foto; quando não consegue confirmar, usa ×1 e marca o ponto “verificar escala”.</span></div>
       <p class="note" id="laAviso" hidden></p>
       <div id="laCamBox" hidden>
         <div class="la-stage"><video id="laVideo" autoplay playsinline muted></video><img id="laImg" alt="Foto do visor" hidden><canvas id="laOver"></canvas><span class="la-rec" id="laRec" aria-hidden="true">● câmera ativa</span></div>
@@ -1563,7 +1569,8 @@ async function salvarPonto(irProx){
   const p0 = state.pontos[sel], temFoto = fotoTemp !== undefined ? !!fotoTemp : !!p0.foto;
   if (raw === '' && temFoto && p0.lux == null) {          // só a foto: o valor é conferido depois no escritório
     const idx = sel; p0.hora = new Date().toISOString();
-    if (fotoTemp !== undefined) { p0.foto = fotoTemp; fotoPut(p0.id, fotoTemp); delete p0.sug; delete p0.sugOrig; }
+    if (fotoTemp !== undefined) { p0.foto = fotoTemp; fotoPut(p0.id, fotoTemp); delete p0.sug; delete p0.sugOrig; delete p0.sugInf; delete p0.sugEsc; delete p0.sugLido; delete p0.lfTent; delete p0.iaPend; }
+    lfFundoPor(p0);   // lê o visor em segundo plano (valor sugerido, sem parar a câmera)
     const prox = irProx ? proximoPendente(idx) : null;
     fechar(); renderTudo();
     if (irProx) { if (prox != null) abrir(prox); else toast(modoConf ? 'Todas as fotos foram conferidas.' : $('altNext').checked ? 'Sequência alternada concluída (pontos ímpares e o último).' : 'Nenhum ponto sem foto.'); }
@@ -1575,7 +1582,7 @@ async function salvarPonto(irProx){
   }
   const p = state.pontos[sel], idx = sel;
   p.lux = Math.round(v*1000)/1000; p.hora = new Date().toISOString(); delete p.auto; delete p.imp;
-  if (p.sug != null) { if (Math.abs(p.sug - p.lux) < 1e-9) p.lidoPor = p.sugOrig; else delete p.lidoPor; delete p.sug; delete p.sugOrig; delete p.sugInf; } else delete p.lidoPor;
+  if (p.sug != null) { if (Math.abs(p.sug - p.lux) < 1e-9) p.lidoPor = p.sugOrig; else delete p.lidoPor; delete p.sug; delete p.sugOrig; delete p.sugInf; delete p.sugEsc; delete p.sugLido; delete p.lfTent; delete p.iaPend; } else delete p.lidoPor;
   if (LA.conf && LA.conf.id === p.id && Math.abs(LA.conf.v - v) < 1e-9) p.ocr = true; else delete p.ocr;
   if (fotoTemp !== undefined) { p.foto = fotoTemp; fotoPut(p.id, fotoTemp); }
   const prox = irProx ? proximoPendente(idx) : null;
@@ -1588,7 +1595,7 @@ async function apagarPonto(){
   if (sel == null) return;
   const p = state.pontos[sel];
   if (!(await confirmar(`Apagar ${p.lux == null ? 'a foto' : 'a medição'} do ponto ${nro(p)}?`, 'Apagar', 'danger'))) return;
-  p.lux = null; p.foto = null; p.hora = null; delete p.auto; delete p.imp; delete p.ocr; delete p.sug; delete p.sugOrig; delete p.sugInf; delete p.lidoPor; fotoPut(p.id, null);
+  p.lux = null; p.foto = null; p.hora = null; delete p.auto; delete p.imp; delete p.ocr; delete p.sug; delete p.sugOrig; delete p.sugInf; delete p.sugEsc; delete p.sugLido; delete p.lfTent; delete p.iaPend; delete p.lidoPor; fotoPut(p.id, null);
   fechar(); renderTudo(); await salvar(); renderLevs();
 }
 
@@ -1638,14 +1645,14 @@ async function laAutoPreencher(src){
     nota.textContent = `Valor não reconhecido nesta foto (${(LA_MSG[r.falha] || 'visor não encontrado').replace(/:.*$/, '').toLowerCase()}). Digite a leitura, ou use “Leitura automática do luxímetro” › “Ler valor de uma foto” e marque o visor com o dedo.`;
     return;
   }
-  const lido = r.valor, v = laReal(lido), txt = laMult() > 1 ? `${laNum(lido)} × ${laMult()} = ${laNum(v)} ${unid(p)}` : `${laNum(v)} ${unid(p)}`;
+  const lido = r.valor, esc = laEscalaDe(r), v = laAplicar(lido, esc), txt = esc.m > 1 ? `${laNum(lido)} × ${esc.m} = ${laNum(v)} ${unid(p)}` : `${laNum(v)} ${unid(p)}`;
   const atual = luxDoCampo($('lux').value);
   if ($('lux').value.trim() !== '' && isFinite(atual) && Math.abs(atual - v) > 1e-9) {
     nota.textContent = `Visor lido na foto: ${txt}. O campo foi mantido com o valor já digitado (${$('lux').value.trim()}).`;
     return;
   }
   $('lux').value = laNum(v) + ' ' + unid(p); $('luxErr').hidden = true; LA.conf = {id, v};
-  nota.textContent = `Valor lido do visor: ${txt}${laMult() === 1 ? '' : ' (multiplicador do visor)'}${r.inferido ? ' — ponto decimal inferido (borrado na foto)' : ''}. Confira com o display e toque em Salvar.`;
+  nota.textContent = `Valor lido do visor: ${txt}${laEscTxt(esc)}${r.inferido ? ' — ponto decimal inferido (borrado na foto)' : ''}. Confira com o display e toque em Salvar.`;
   toast(`Leitura ${txt} preenchida. Confira e salve.`);
 }
 function lerArquivoFoto(file){
@@ -2338,8 +2345,8 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 #laPrev{width:100%;height:auto;border:1px solid var(--line);border-radius:6px;margin-top:8px;image-rendering:pixelated;background:#fff}
 </style>`);
 const LA_KEY = 'malhaNBR5101_luxcal';
-const LA = {focoMin:.2, cal:{roi:{x:.15, y:.25, w:.70, h:.45}, shear:'auto', pol:'auto', tol:0, cons:3, mult:1}, ctx:null, ref:null, cnt:0, ultimo:null, timer:null, busy:false, best:null, drag:null, conf:null, cv:null, stable:false};
-(function laCarregar(){ try { const o = JSON.parse(localStorage.getItem(LA_KEY) || 'null'); if (o && o.roi) LA.cal = {...LA.cal, ...o}; } catch (e) {} })();
+const LA = {focoMin:.2, cal:{escV2:1, mult:'auto', roi:{x:.15, y:.25, w:.70, h:.45}, shear:'auto', pol:'auto', tol:0, cons:3}, ctx:null, ref:null, cnt:0, ultimo:null, timer:null, busy:false, best:null, drag:null, conf:null, cv:null, stable:false};
+(function laCarregar(){ try { const o = JSON.parse(localStorage.getItem(LA_KEY) || 'null'); if (o && o.roi) LA.cal = {...LA.cal, ...o}; if (!LA.cal.escV2) { LA.cal.mult = 'auto'; LA.cal.escV2 = 1; } } catch (e) {} })();   // versão com escala automática: passa a valer o automático
 const laSalvarCal = () => { try { localStorage.setItem(LA_KEY, JSON.stringify(LA.cal)); } catch (e) {} };
 const LA_PAT = {'1111110':'0','0110000':'1','1101101':'2','1111001':'3','0110011':'4','1011011':'5','1011111':'6','0011111':'6','1110000':'7','1110010':'7','1111111':'8','1111011':'9','1110011':'9'};
 const LA_SEG = {a:[.22,.78,0,.11], b:[.76,1,.10,.46], c:[.76,1,.54,.90], d:[.22,.78,.89,1], e:[0,.24,.54,.90], f:[0,.24,.10,.46], g:[.22,.78,.43,.57]};   // caixas rentes à espessura das barras: ligado ≈ .65–.9, desligado ≈ 0
@@ -2548,7 +2555,15 @@ function laDesenharPrev(r){
 }
 const laNum = v => String(v).replace('.', ',');
 /* multiplicador do visor (X10, X100): o valor gravado é o lido × multiplicador */
-const laMult = () => Number(LA.cal.mult) || 1;
+const laMult = () => Number(LA.cal.mult) || 1;   // manual; no automático vale 1 onde a foto não é analisada
+const laAuto = () => LA.cal.mult === 'auto';
+/* escala de uma leitura: {m, origem} — origem 'manual' | 'x10' (X10 reconhecido) | 'x1' (sem X10) | 'incerto' */
+function laEscalaDe(r){
+  if (!laAuto()) return {m:laMult(), origem:'manual'};
+  const e = r && r.escala; return e === 10 ? {m:10, origem:'x10'} : e === 1 ? {m:1, origem:'x1'} : {m:1, origem:'incerto'};
+}
+const laAplicar = (v, esc) => Math.round(v * esc.m * 1000) / 1000;
+const laEscTxt = esc => esc.origem === 'x10' ? ' (X10 reconhecido no visor: ×10)' : esc.origem === 'incerto' ? ' — escala não reconhecida na foto: confira se o visor mostra X10' : esc.m > 1 ? ` (multiplicador ×${esc.m})` : '';
 const laReal = v => Math.round(v * laMult() * 1000) / 1000;
 const laTxt = v => laMult() > 1 ? `${laNum(v)} × ${laMult()} = ${laNum(laReal(v))} lx` : `${laNum(v)} lx`;
 const laCtxOk = () => !!(LA.ctx && sel != null && state.pontos[sel] && state.pontos[sel].id === LA.ctx.id);
@@ -2620,7 +2635,7 @@ async function laConfirmar(fonteCv, valor, origem){
   // fonteCv: canvas/imagem da foto; valor: leitura reconhecida
   if (sel == null) return false; const p = state.pontos[sel];
   if (origem === 'video' && !laCtxOk()) { toast('O ponto mudou: leitura descartada.'); laStop(); return false; }
-  const lido = valor; valor = laReal(valor);
+  const lido = valor, esc = laEscalaDe(origem === 'foto' ? LA.ultimo : null); valor = laAplicar(valor, esc);
   const atual = $('lux').value.trim();
   if ((p.lux != null || atual !== '') && Math.abs((num(atual) ?? NaN) - valor) > 1e-9) {
     if (!(await confirmar(`O ponto ${nro(p)} já tem ${atual !== '' ? 'o valor ' + atual : 'medição'}. Substituir por ${laNum(valor)} ${unid(p)}?`, 'Substituir', 'danger'))) return false;
@@ -2628,12 +2643,12 @@ async function laConfirmar(fonteCv, valor, origem){
   fotoTemp = carimbar(fonteCv, fonteCv.naturalWidth || fonteCv.width, fonteCv.naturalHeight || fonteCv.height);
   $('lux').value = laNum(valor) + ' ' + unid(p); $('luxErr').hidden = true; LA.conf = {id:p.id, v:valor};
   pararCamera(); mostrarFoto(fotoTemp);
-  toast(`Leitura ${laMult() > 1 ? laNum(lido) + ' × ' + laMult() + ' = ' : ''}${laNum(valor)} ${unid(p)} preenchida. Confira e toque em Salvar.`);
+  toast(`Leitura ${esc.m > 1 ? laNum(lido) + ' × ' + esc.m + ' = ' : ''}${laNum(valor)} ${unid(p)} preenchida${esc.origem === 'incerto' ? ' (escala não confirmada: confira se o visor mostra X10)' : ''}. Confira e toque em Salvar.`, esc.origem === 'incerto' ? 5000 : undefined);
   return true;
 }
 $('laIniciar').onclick = laIniciar;
-$('laMult').value = String(laMult());
-$('laMult').onchange = () => { LA.cal.mult = Number($('laMult').value) || 1; laSalvarCal(); if (LA.foto && LA.ultimo) laMostrarFoto(LA.ultimo); };
+$('laMult').value = laAuto() ? 'auto' : String(laMult());
+$('laMult').onchange = () => { const v = $('laMult').value; LA.cal.mult = v === 'auto' ? 'auto' : (Number(v) || 1); laSalvarCal(); if (LA.foto && LA.ultimo) laMostrarFoto(LA.ultimo); };
 $('lux').addEventListener('blur', () => { if (sel == null) return; const v = luxDoCampo($('lux').value); if (isFinite(v)) $('lux').value = laNum(v) + ' ' + unid(state.pontos[sel]); });
 $('laParar').onclick = () => { const s0 = stream; pararCamera(); };
 $('laConfirmar').onclick = async () => { if (!LA.stable || !LA.best || LA.ref == null) return; const cv = LA.best.cv, v = LA.ref, foto = !!LA.foto; await laConfirmar(cv, v, foto ? 'foto' : 'video'); if (foto) laStop(); };
@@ -2919,12 +2934,56 @@ function vzDecodificar(c){
 /* formato do visor: sempre com uma casa decimal (0.0 a 1999.9); sem ponto só com 4 dígitos ou mais */
 function vzEscala(c, k){ const o = document.createElement('canvas'); o.width = Math.max(20, Math.round(c.width * k)); o.height = Math.max(10, Math.round(c.height * k));
   const g = o.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(c, 0, 0, o.width, o.height); o.__y0 = c.__y0 || 0; o.__hf = c.__hf || 1; return o; }
+/* desfoque em JS (o Safari do iPhone não aplica ctx.filter): 3 passadas de média móvel no canal vermelho ≈ gaussiano */
+function vzBorrar(c, r){
+  const W = c.width, H = c.height, src = c.getContext('2d', {willReadFrequently:true}).getImageData(0, 0, W, H), d = src.data, n = W * H;
+  let a = new Float32Array(n), b = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = d[i*4];
+  const k = Math.max(1, Math.round((Math.sqrt(1 + 4 * r * r) - 1) / 2));   // r = desvio do gaussiano equivalente (3 passadas: σ² = k(k+1))
+  for (let pass = 0; pass < 3; pass++) {
+    for (let y = 0; y < H; y++) { let s = 0; const o = y * W;
+      for (let x = -k; x <= k; x++) s += a[o + Math.min(W - 1, Math.max(0, x))];
+      for (let x = 0; x < W; x++) { b[o + x] = s / (2*k + 1); s += a[o + Math.min(W - 1, x + k + 1)] - a[o + Math.max(0, x - k)]; } }
+    for (let x = 0; x < W; x++) { let s = 0;
+      for (let y = -k; y <= k; y++) s += b[Math.min(H - 1, Math.max(0, y)) * W + x];
+      for (let y = 0; y < H; y++) { a[y*W + x] = s / (2*k + 1); s += b[Math.min(H - 1, y + k + 1) * W + x] - b[Math.max(0, y - k) * W + x]; } }
+  }
+  return a;   // Float32Array (W × H) com o cinza borrado
+}
 function vzNitidez(c, r){   // máscara de nitidez: original + (original - borrado)
   const W = c.width, H = c.height, o = document.createElement('canvas'); o.width = W; o.height = H; const g = o.getContext('2d', {willReadFrequently:true});
-  g.filter = `blur(${r}px)`; g.drawImage(c, 0, 0); g.filter = 'none';
-  const b = g.getImageData(0, 0, W, H), a = c.getContext('2d', {willReadFrequently:true}).getImageData(0, 0, W, H), d = a.data, e = b.data;
-  for (let i = 0; i < d.length; i += 4) { const v = Math.max(0, Math.min(255, 2 * d[i] - e[i])); d[i] = d[i+1] = d[i+2] = v; }
+  const e = vzBorrar(c, r), a = c.getContext('2d', {willReadFrequently:true}).getImageData(0, 0, W, H), d = a.data;
+  for (let i = 0; i < W * H; i++) { const v = Math.max(0, Math.min(255, Math.round(2 * d[i*4] - e[i]))); d[i*4] = d[i*4+1] = d[i*4+2] = v; }
   g.putImageData(a, 0, 0); o.__y0 = c.__y0 || 0; o.__hf = c.__hf || 1; return o; }
+/* ---------- Escala do visor (X10) reconhecida na foto ----------
+   No visor endireitado, o indicador "X10" fica na faixa de ícones, à esquerda do bloco HOLD. Procura traços finos
+   (escuros em relação ao entorno) nessa faixa; exige achar o HOLD como referência de posição.
+   Resultado: 10 (X10 visível), 1 (HOLD achado e canto vazio) ou null (incerto: foto escura, borrada ou sem HOLD).
+   Calibrado com 144 fotos noturnas de Arujá e 36 diurnas: nenhum falso X10 nem X10 perdido; o que não é nítido fica incerto. */
+function vzRunsIcones(c, lim, raio, luzMin){
+  const W = c.width, H = c.height, y0 = Math.round(H * .025), y1 = Math.round(H * .17);
+  const d = c.getContext('2d', {willReadFrequently:true}).getImageData(0, 0, W, H).data, e = vzBorrar(c, raio), cols = new Float64Array(W);
+  for (let y = y0; y < y1; y++) for (let x = 0; x < W; x++) { const i = y*W + x; if (e[i] - d[i*4] > lim && e[i] > luzMin) cols[x]++; }
+  const runs = []; let a = -1, gap = 0;
+  for (let x = 0; x <= W; x++) { const on = x < W && cols[x] >= 2;
+    if (on) { if (a < 0) a = x; gap = 0; } else if (a >= 0) { gap++; if (gap > W * .02 || x === W) { const z = x - gap; let s = 0; for (let k = a; k <= z; k++) s += cols[k]; runs.push({x0:a / W, x1:z / W, w:(z - a) / W, ink:s / ((z - a + 1) * (y1 - y0))}); a = -1; gap = 0; } } }
+  return runs;
+}
+function vzEscalaX10(c){
+  try {
+    const niveis = [[28, 7, 90], [20, 7, 70], [14, 9, 50], [10, 11, 40]];
+    for (let n = 0; n < niveis.length; n++) {
+      const [lim, raio, luz] = niveis[n], runs = vzRunsIcones(c, lim, raio, luz);
+      const anc = runs.filter(r => r.w >= .10 && r.w <= .20 && r.x0 >= .28 && r.x0 <= .45 && r.ink >= .04);   // bloco HOLD
+      if (anc.length !== 1) continue;
+      const a = anc[0], canto = runs.filter(r => r.x0 >= .04 && r.x1 <= a.x0 - .03);
+      /* X10 só é aceito no limiar mais rigoroso (texto nítido); nos limiares sensíveis um borrão pode imitar texto */
+      if (canto.some(r => r.w >= .07 && r.ink >= .03 && r.ink <= .15)) return n === 0 ? 10 : null;
+      if (!canto.length) return 1;
+      return null;
+    }
+  } catch (e) {}
+  return null;
+}
 /* tira a faixa de cima do visor (ícones HOLD, relógio, bateria): corta na primeira linha vazia acima dos dígitos */
 function vzSemHold(c){
   /* do topo para baixo: pula linhas vazias, acha a 1ª faixa de tinta; se for baixa (ícones, < 9 % da altura), corta logo abaixo dela */
@@ -2975,7 +3034,7 @@ function laLerVisor(src){
       if (aqui.length) { const tx = new Set(aqui.map(l => l.texto)); if (tx.size === 1) { const comPonto = aqui.find(l => !l.inferido); lidos.push({...(comPonto || aqui[0]), inferido:!comPonto, votos:aqui.length}); } else return {falha:'ambiguo', visor:true, bx:v}; }
     }
     const txt = [...new Set(lidos.map(l => l.texto))];
-    if (txt.length === 1) return {...lidos[0], visor:true, bx:v};
+    if (txt.length === 1) { const r = lidos[0]; return {...r, escala:vzEscalaX10(r.crop), visor:true, bx:v}; }
     if (txt.length > 1) return {falha:'ambiguo', visor:true, bx:v};     // dois sentidos dão leituras diferentes: não escolhe
   }
   return {falha:'padrao', visor:true, bx:cands[0]};
@@ -3044,7 +3103,7 @@ $('btnLimpar').onclick = async () => {
   const med = nMed();
   if (!med) { toast('Nenhuma medição para limpar.'); return; }
   if (!(await confirmar(`Apagar ${med} medição(ões) e fotos deste levantamento?`, 'Apagar', 'danger'))) return;
-  state.pontos.forEach(p => { p.lux = null; p.foto = null; p.hora = null; delete p.auto; delete p.imp; delete p.ocr; delete p.sug; delete p.sugOrig; delete p.sugInf; delete p.lidoPor; }); state.exemplo = false;
+  state.pontos.forEach(p => { p.lux = null; p.foto = null; p.hora = null; delete p.auto; delete p.imp; delete p.ocr; delete p.sug; delete p.sugOrig; delete p.sugInf; delete p.sugEsc; delete p.sugLido; delete p.lfTent; delete p.iaPend; delete p.lidoPor; }); state.exemplo = false;
   await fotosApagarLev(state.id); renderTudo(); await salvar(); renderLevs();
 };
 document.querySelectorAll('input[name=calc]').forEach(r => r.onchange = () => { syncCalcUI(); checarDirty(); });
@@ -3145,7 +3204,7 @@ $('btnPacote').onclick = async () => {
    Gera uma SUGESTÃO de valor (p.sug) para cada ponto com foto e sem valor. A sugestão não entra na conformidade:
    só vira medição quando o usuário confere a foto e confirma em "Conferir fotos". */
 document.head.insertAdjacentHTML('beforeend', '<style>.lf{margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:12px}</style>');
-const LF_PROMPT = 'Esta é a foto (muitas vezes noturna, tremida, girada ou com o visor estourado de luz) do visor de 7 segmentos de um luxímetro digital. O visor tem duas linhas de dígitos grandes: a de CIMA é a iluminância (junto de "LX"); a de BAIXO é a temperatura (junto de "°C") e deve ser ignorada. Se a foto estiver girada, leia considerando o visor em pé (ícones HOLD e bateria no topo). Ignore HOLD, MAX/MIN, bateria, indicadores X10/X100 e a unidade; o multiplicador é aplicado depois. O valor de iluminância sempre tem exatamente uma casa decimal (ex.: 4.8, 38.3, 152.3); o dígito 1 ocupa só o lado direito da casa. Responda SOMENTE neste formato, sem mais nada: VALOR=<número com ponto decimal> UNIDADE=<lx|klx|fc|?>. Se algum dígito estiver ilegível, cortado ou ambíguo, responda VALOR=?. Não estime nem complete dígitos.';
+const LF_PROMPT = 'Esta é a foto (muitas vezes noturna, tremida, girada ou com o visor estourado de luz) do visor de 7 segmentos de um luxímetro digital. O visor tem duas linhas de dígitos grandes: a de CIMA é a iluminância (junto de "LX"); a de BAIXO é a temperatura (junto de "°C") e deve ser ignorada. Se a foto estiver girada, leia considerando o visor em pé (ícones HOLD e bateria no topo). Ignore HOLD, MAX/MIN, bateria, indicadores X10/X100 e a unidade; o multiplicador é aplicado depois. O valor de iluminância sempre tem exatamente uma casa decimal (ex.: 4.8, 38.3, 152.3); o dígito 1 ocupa só o lado direito da casa. Informe também a escala: ESCALA=10 se o visor mostrar o indicador X10, ESCALA=100 se mostrar X100, ESCALA=1 se não houver indicador, ESCALA=? se não der para ver. Responda SOMENTE neste formato, sem mais nada: VALOR=<número com ponto decimal> UNIDADE=<lx|klx|fc|?> ESCALA=<1|10|100|?>. Se algum dígito estiver ilegível, cortado ou ambíguo, responda VALOR=?. Não estime nem complete dígitos.';
 let lfRodando = false, lfParar = false;
 function lfImagem(p){   // foto carimbada -> imagem sem a barra de legenda
   return new Promise((ok, er) => { const im = new Image(); im.onload = () => {
@@ -3162,7 +3221,8 @@ async function lfIA(canvas, key, modelo){
     const j = await r.json().catch(() => null);
     if (!r.ok) throw new Error((j && j.error && j.error.message) || ('HTTP ' + r.status));
     const t = ((j && j.content) || []).filter(x => x.type === 'text').map(x => x.text).join(' ');
-    const m = /VALOR\s*=\s*(\d+(?:[.,]\d+)?)/i.exec(t), u = /UNIDADE\s*=\s*([a-z?]+)/i.exec(t);
+    const m = /VALOR\s*=\s*(\d+(?:[.,]\d+)?)/i.exec(t), u = /UNIDADE\s*=\s*([a-z?]+)/i.exec(t), es = /ESCALA\s*=\s*(\d+|\?)/i.exec(t);
+    lfIA.escala = es && /^(1|10|100)$/.test(es[1]) ? Number(es[1]) : null;
     if (!m) return null;
     let v = parseFloat(m[1].replace(',', '.')); const un = u ? u[1].toLowerCase() : '?';
     if (un === 'fc') return null; if (un === 'klx') v *= 1000;
@@ -3170,10 +3230,10 @@ async function lfIA(canvas, key, modelo){
   } finally { clearTimeout(to); }
 }
 async function lfLocal(canvas){
-  let r = laLerVisor(canvas);
+  let r = laLerVisor(canvas); lfLocal.r = null;
   if (r.valor == null && !r.visor) r = laLerGirando(canvas);
   if (r.valor == null && !r.visor) { const a = await laProcurar(canvas, () => {}, () => true); if (a) r = a.r; }   // visor achado e não lido: não chuta com a busca por janelas
-  lfLocal.inferido = !!(r.valor != null && r.inferido);
+  lfLocal.inferido = !!(r.valor != null && r.inferido); lfLocal.r = r;
   return r.valor != null ? r.valor : null;
 }
 async function lerLote(){
@@ -3184,21 +3244,165 @@ async function lerLote(){
   if (modo === 'ia' && !key) { toast('Informe a chave de API para a leitura por IA.'); $('lfKey').focus(); return; }
   if (modo === 'ia') { try { localStorage.setItem(LS_KEY, key); } catch (e) {} }
   lfRodando = true; lfParar = false; const b = $('lfIr'); b.textContent = 'Parar leitura';
-  let ok = 0, falha = 0, i = 0, recusada = false;
+  let ok = 0, falha = 0, i = 0, recusada = false, nX10 = 0, nInc = 0;
   try {
     for (const p of alvo) {
       if (lfParar) break; i++; $('lfSt').textContent = `Lendo o ponto ${nro(p)} (${i}/${alvo.length})…`;
       try {
-        const c = await lfImagem(p), lido = modo === 'ia' ? await lfIA(c, key, modelo) : await lfLocal(c), v = lido == null ? null : laReal(lido);   // multiplicador do visor (X10, X100)
-        if (v != null && v >= 0 && v <= 200000) { p.sug = Math.round(v * 1000) / 1000; p.sugOrig = modo; if (modo !== 'ia' && lfLocal.inferido) p.sugInf = true; else delete p.sugInf; ok++; } else falha++;
+        const c = await lfImagem(p), lido = modo === 'ia' ? await lfIA(c, key, modelo) : await lfLocal(c), esc = laEscalaDe(modo === 'ia' ? {escala:lfIA.escala} : lfLocal.r), v = lido == null ? null : laAplicar(lido, esc);   // escala do visor (X10)
+        if (v != null && v >= 0 && v <= 200000) { lfSugerir(p, lido, esc, modo === 'ia' ? 'ia' : 'local', modo !== 'ia' && lfLocal.inferido); ok++; if (esc.origem === 'x10') nX10++; if (esc.origem === 'incerto') nInc++; } else { falha++; p.lfTent = true; }
       } catch (e) { falha++; if (/401|x-api-key|authentication/i.test(String(e && e.message))) { recusada = true; break; } }
       if (i % 5 === 0) { await salvar({semArquivo:true}); renderTabela(); }
     }
   } finally { lfRodando = false; b.textContent = 'Ler valores das fotos'; await salvar({semArquivo:true}); renderTudo(); }
   $('lfSt').textContent = recusada ? 'A chave de API foi recusada. Confira a chave e tente de novo.'
-    : `${ok} leitura(s) sugerida(s), ${falha} sem leitura${lfParar ? ' (interrompido)' : ''}${laMult() > 1 ? ` · multiplicador ×${laMult()} aplicado` : ''}. Confira na grade abaixo ou em “Conferir fotos”.`;
+    : `${ok} leitura(s) sugerida(s), ${falha} sem leitura${lfParar ? ' (interrompido)' : ''}${laAuto() ? ` · X10 reconhecido em ${nX10}${nInc ? `, escala a verificar em ${nInc}` : ''}` : laMult() > 1 ? ` · multiplicador ×${laMult()} aplicado` : ''}. Confira na grade abaixo ou em “Conferir fotos”.`;
   if (!recusada) lfMontarGrade();
 }
+/* ---------- Leitura em segundo plano (em campo) ----------
+   Cada foto salva sem valor (inclusive em “Capturar e ir ao próximo ponto”) entra numa fila. A leitura do visor roda
+   num Web Worker — um processo à parte, que não trava a câmera nem a tela — e o valor entra como SUGERIDO, com a escala
+   (X10) reconhecida na foto. Se a leitura local não conseguir e a opção estiver ligada, a foto vai para a IA online;
+   sem sinal, espera na fila e segue quando a internet voltar. Nada entra na conformidade sem a conferência na grade.
+   Sem Web Worker (navegador antigo), lê na própria tela, mas só com a câmera fechada. */
+function lfSugerir(p, lido, esc, orig, inf){
+  p.sug = laAplicar(lido, esc); p.sugOrig = orig; p.sugLido = lido; p.sugEsc = esc.origem;
+  if (inf) p.sugInf = true; else delete p.sugInf; delete p.lfTent; delete p.iaPend;
+}
+const LF_FUNCS = ['laOtsu','laPct','laDil','laEro','laFechar','laPreencher','laLinhaVisor','laPercentis','laNitidez','laBinarizar','laLimpar','laBorda','laBolha','laTentar','laDecodificar','laAnalisarFonte',
+  'vzMascaras','vzComponentes','vzRetMin','vzAcharVisores','vzRecorte','vzMiolo','vzLinhaTopo','vzDecodificar','vzEscala','vzBorrar','vzNitidez','vzRunsIcones','vzEscalaX10','vzSemHold','vzGama','vzFormatoOk','laLerVisor'];
+const LF2 = {fila:[], rodando:false, w:null, wFalhou:false, pend:new Map(), seq:0, ia:[], iaRodando:false, iaRecusada:false, tSalvar:null};
+function lfWorkerURL(){
+  const corpo = LF_FUNCS.map(n => window[n].toString()).join('\n');
+  const src = `self.document = {createElement: () => new OffscreenCanvas(1, 1)};
+const LA_PAT = ${JSON.stringify(LA_PAT)}, LA_SEG = ${JSON.stringify(LA_SEG)};
+const LA = {focoMin:${JSON.stringify(LA.focoMin)}, cal:{}, cv:null};
+${corpo}
+self.onmessage = async e => {
+  const {id, foto, cal} = e.data;
+  try {
+    LA.cal = cal;
+    const bmp = await createImageBitmap(await (await fetch(foto)).blob());
+    const W = bmp.width, fs = Math.max(14, Math.round(W * .026)), bar = Math.round(fs * 2.9), H = Math.max(10, bmp.height - bar);
+    const c = new OffscreenCanvas(W, H); c.getContext('2d').drawImage(bmp, 0, 0, W, H, 0, 0, W, H); if (bmp.close) bmp.close();
+    const r = laLerVisor(c);
+    postMessage({id, valor:r.valor != null ? r.valor : null, texto:r.texto || null, inferido:!!r.inferido, escala:r.escala == null ? null : r.escala, visor:!!r.visor});
+  } catch (err) { postMessage({id, erro:String(err && err.message || err)}); }
+};`;
+  return URL.createObjectURL(new Blob([src], {type:'text/javascript'}));
+}
+function lfWorker(){
+  if (LF2.w || LF2.wFalhou) return LF2.w;
+  try {
+    if (typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined' || !new OffscreenCanvas(1, 1).getContext('2d')) throw new Error('sem OffscreenCanvas');
+    const w = new Worker(lfWorkerURL());
+    w.onmessage = e => { const f = LF2.pend.get(e.data.id); if (f) { LF2.pend.delete(e.data.id); f(e.data); } };
+    w.onerror = () => { LF2.wFalhou = true; for (const f of LF2.pend.values()) f({erro:'worker'}); LF2.pend.clear(); try { w.terminate(); } catch (_) {} LF2.w = null; lfFundoUI(); };
+    LF2.w = w;
+  } catch (e) { LF2.wFalhou = true; LF2.w = null; }
+  return LF2.w;
+}
+function lfLerFoto(foto){
+  const w = lfWorker();
+  if (w) return new Promise(ok => {
+    const id = ++LF2.seq, t = setTimeout(() => { LF2.pend.delete(id); ok({erro:'tempo'}); }, 90000);
+    LF2.pend.set(id, r => { clearTimeout(t); if (r.erro === 'worker') lfLerFoto(foto).then(ok); else ok(r); });   // worker caiu: refaz na tela
+    w.postMessage({id, foto, cal:JSON.parse(JSON.stringify(LA.cal))});
+  });
+  return new Promise(ok => {   // sem worker: lê na tela, mas só com a câmera fechada (não trava a captura)
+    const tenta = async () => {
+      if (stream || LA.timer) { setTimeout(tenta, 1500); return; }
+      try { const c = await lfImagem({foto}), r = laLerVisor(c); ok({valor:r.valor != null ? r.valor : null, inferido:!!r.inferido, escala:r.escala == null ? null : r.escala, visor:!!r.visor}); }
+      catch (e) { ok({erro:String(e && e.message || e)}); }
+    };
+    setTimeout(tenta, 400);
+  });
+}
+const lfNaFila = (lst, lev, id) => lst.some(x => x.lev === lev && x.id === id);
+function lfFundoPor(p){
+  if (!$('lfFundoOn').checked || !p || !p.foto || p.lux != null || p.sug != null) return;
+  if (!lfNaFila(LF2.fila, state.id, p.id)) LF2.fila.push({lev:state.id, id:p.id});
+  lfFundoUI(); lfFundoRodar();
+}
+function lfFundoSalvar(){
+  clearTimeout(LF2.tSalvar);
+  LF2.tSalvar = setTimeout(async () => { try { await salvar({semArquivo:true}); } catch (_) {} try { if ($('modal').hidden) renderTudo(); else renderTabela(); } catch (_) {} }, 1200);
+}
+async function lfFundoRodar(){
+  if (LF2.rodando) return; LF2.rodando = true;
+  try {
+    while (LF2.fila.length) {
+      const {lev, id} = LF2.fila[0], pto = () => state.id === lev ? state.pontos.find(x => x.id === id) : null, p = pto();
+      if (p && p.foto && p.lux == null && p.sug == null) {
+        const foto = p.foto; lfFundoUI();
+        const r = await lfLerFoto(foto), q = pto();   // o ponto pode ter mudado enquanto lia
+        if (q && q.foto === foto && q.lux == null && q.sug == null) {
+          if (r.valor != null && r.valor >= 0 && r.valor <= 200000) lfSugerir(q, r.valor, laEscalaDe(r), 'local', r.inferido);
+          else { q.lfTent = true; if (lfIAOk()) { q.iaPend = true; lfIAPor(q); } }
+          lfFundoSalvar();
+        }
+      }
+      LF2.fila.shift();
+    }
+  } finally { LF2.rodando = false; lfFundoUI(); }
+}
+/* IA online como reserva */
+const lfIAOk = () => $('lfFundoIA').checked && !!$('lfKey').value.trim() && !LF2.iaRecusada;
+function lfIAPor(p){ if (!lfNaFila(LF2.ia, state.id, p.id)) LF2.ia.push({lev:state.id, id:p.id}); lfFundoUI(); lfIARodar(); }
+async function lfIARodar(){
+  if (LF2.iaRodando || !LF2.ia.length) return;
+  if (!navigator.onLine) { lfFundoUI(); return; }   // segue no evento 'online'
+  LF2.iaRodando = true;
+  try {
+    while (LF2.ia.length && navigator.onLine && lfIAOk()) {
+      const {lev, id} = LF2.ia[0], p = state.id === lev ? state.pontos.find(x => x.id === id) : null;
+      if (p && p.foto && p.lux == null && p.sug == null) {
+        lfFundoUI();
+        try {
+          const c = await lfImagem(p), v = await lfIA(c, $('lfKey').value.trim(), $('impModelo').value.trim() || 'claude-sonnet-5-5');
+          if (p.lux == null && p.sug == null) { if (v != null && v >= 0 && v <= 200000) lfSugerir(p, v, laEscalaDe({escala:lfIA.escala}), 'ia', false); else delete p.iaPend; }
+          lfFundoSalvar();
+        } catch (e) {
+          const msg = String(e && e.message || e);
+          if (/401|x-api-key|authentication/i.test(msg)) { LF2.iaRecusada = true; toast('IA online: a chave de API foi recusada. As fotos ficam para a leitura no escritório.', 6000); break; }
+          if (!navigator.onLine || /network|failed to fetch|load failed|abort/i.test(msg)) break;   // sem sinal: tenta de novo quando a internet voltar
+          delete p.iaPend; lfFundoSalvar();   // outro erro: este ponto fica para o escritório
+        }
+      }
+      LF2.ia.shift();
+    }
+  } finally { LF2.iaRodando = false; lfFundoUI(); }
+}
+window.addEventListener('online', () => lfIARodar());
+window.addEventListener('offline', () => lfFundoUI());
+setInterval(() => { if (LF2.ia.length && !LF2.iaRodando) lfIARodar(); }, 60000);
+function lfFundoUI(){
+  const nl = LF2.fila.length, ni = LF2.ia.length, chip = $('lfFundoChip'), st = $('lfFundoSt');
+  const t = nl ? `lendo ${nl} foto(s)…` : ni ? (navigator.onLine ? `IA: ${ni} na fila…` : `IA: ${ni} aguardando internet`) : '';
+  if (chip) { chip.hidden = !t; chip.textContent = t ? '· ' + t : ''; }
+  if (st) st.textContent = t ? 'Em andamento: ' + t : (LF2.wFalhou && $('lfFundoOn').checked ? 'Este navegador não lê em paralelo: a leitura em segundo plano roda quando a câmera estiver fechada.' : '');
+}
+/* retoma ao abrir o app ou trocar de levantamento: fotos ainda sem leitura e pendências da IA */
+function lfFundoRetomar(){
+  if (!state || !state.pontos) return;
+  for (const p of state.pontos) {
+    if (!p.foto || p.lux != null || p.sug != null) continue;
+    if (p.iaPend) { if (lfIAOk()) lfIAPor(p); }
+    else if (!p.lfTent) lfFundoPor(p);
+  }
+}
+(function lfFundoPrefs(){
+  try { const a = localStorage.getItem('malhaNBR5101.lfFundoOn'), b = localStorage.getItem('malhaNBR5101.lfFundoIA'); if (a != null) $('lfFundoOn').checked = a === '1'; if (b != null) $('lfFundoIA').checked = b === '1'; } catch (e) {}
+  $('lfFundoOn').onchange = () => { try { localStorage.setItem('malhaNBR5101.lfFundoOn', $('lfFundoOn').checked ? '1' : '0'); } catch (e) {} if ($('lfFundoOn').checked) lfFundoRetomar(); lfFundoUI(); };
+  $('lfFundoIA').onchange = () => {
+    try { localStorage.setItem('malhaNBR5101.lfFundoIA', $('lfFundoIA').checked ? '1' : '0'); if ($('lfFundoIA').checked && $('lfKey').value.trim()) localStorage.setItem(LS_KEY, $('lfKey').value.trim()); } catch (e) {}
+    if ($('lfFundoIA').checked && !$('lfKey').value.trim()) toast('Informe a chave de API (IA online) para usar a IA em campo.');
+    LF2.iaRecusada = false; if ($('lfFundoIA').checked) lfFundoRetomar(); lfFundoUI(); if (typeof lfChaveVis === 'function') lfChaveVis();
+  };
+})();
+{ const _abrirLev = abrirLev; abrirLev = async (...a) => { const r = await _abrirLev(...a); try { lfFundoRetomar(); } catch (_) {} return r; }; }
+setTimeout(() => { try { lfFundoRetomar(); } catch (_) {} }, 2500);
+
 /* ---------- Conferência em grade ----------
    Todos os pontos com foto e sem valor numa grade: recorte do visor, valor sugerido (editável) e “conferido”.
    Só os marcados como conferidos são gravados. Toque no recorte para ver a foto inteira. */
@@ -3211,6 +3415,10 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 .lfg-row{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:.85rem}
 .lfg-in{display:flex;align-items:center;gap:6px}.lfg-in input{flex:1;min-width:0;padding:8px;font:700 1.05rem var(--f-num, ui-monospace, monospace);border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);text-align:right}
 .lfg-ok{display:flex;align-items:center;gap:8px;font-size:.86rem;font-weight:600;min-height:32px}.lfg-ok input{width:20px;height:20px}
+.lfg-esc{font-size:.78rem;font-weight:700;border-radius:8px;padding:2px 8px;align-self:flex-start}.lfg-esc.ok{background:var(--ok-bg, #e2f4e9);color:var(--ok)}.lfg-esc.warn{background:var(--warn-bg, #fff0dc);color:var(--warn)}
+.lfg-card.esc{border-color:var(--warn);box-shadow:0 0 0 1px var(--warn) inset}
+.lfg-x10{min-height:40px;padding:0 10px}.lfg-x10.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.lf-campo{border:1px dashed var(--line);border-radius:10px;padding:10px;margin-bottom:6px}.lf-op{display:flex;gap:10px;align-items:flex-start;font-size:.88rem;margin:6px 0}.lf-op input{width:20px;height:20px;flex:none;margin-top:2px}
 </style>`);
 async function lfRecorteVisor(p){
   try {
@@ -3229,13 +3437,17 @@ async function lfMontarGrade(){
   const cards = [];
   for (const p of lst) {
     const rec = await lfRecorteVisor(p), sug = p.sug != null ? laNum(p.sug) : '';
-    cards.push(`<div class="lfg-card" data-id="${p.id}">
+    const m = p.sug != null && p.sugLido ? Math.round(p.sug / p.sugLido) : 1, lidoRaw = p.sugLido != null ? p.sugLido : (p.sug != null ? p.sug : '');
+    const orig = p.sug == null ? (p.iaPend ? 'na fila da IA' : 'sem leitura') : p.sugOrig === 'ia' ? 'sugerido (IA)' : p.sugInf ? 'local · ponto inferido' : 'sugerido (local)';
+    const escChip = p.sug == null ? '' : p.sugEsc === 'x10' ? '<span class="lfg-esc ok">X10 reconhecido · ×10</span>' : p.sugEsc === 'incerto' ? '<span class="lfg-esc warn">verificar escala (X10?)</span>' : '';
+    cards.push(`<div class="lfg-card${p.sugEsc === 'incerto' ? ' esc' : ''}" data-id="${p.id}" data-lido="${lidoRaw}" data-m="${m}">
       <img src="${rec || p.foto}" data-rec="${rec ? '1' : ''}" alt="Visor do ponto ${nro(p)}">
-      <div class="lfg-row"><b>Ponto ${nro(p)}</b><span class="note" style="margin:0">${p.sug != null ? (p.sugOrig === 'ia' ? 'sugerido (IA)' : p.sugInf ? 'local · ponto inferido' : 'sugerido (local)') : 'sem leitura'}</span></div>
-      <label class="lfg-in"><input type="text" inputmode="decimal" value="${sug}" placeholder="digite" aria-label="Valor do ponto ${nro(p)}"><span>${unid(p)}</span></label>
+      <div class="lfg-row"><b>Ponto ${nro(p)}</b><span class="note" style="margin:0">${orig}</span></div>${escChip}
+      <div class="lfg-in"><input type="text" inputmode="decimal" value="${sug}" placeholder="digite" aria-label="Valor do ponto ${nro(p)}"><span>${unid(p)}</span>
+        <button type="button" class="btn ghost small lfg-x10${m === 10 ? ' on' : ''}" title="Visor em X10: multiplica o valor lido por 10" aria-pressed="${m === 10}">×10</button></div>
       <label class="lfg-ok"><input type="checkbox"> Conferido</label></div>`);
   }
-  box.innerHTML = `<p class="note">Compare cada número com o recorte do visor (toque no recorte para ver a foto inteira)${laMult() > 1 ? `. Os valores já estão multiplicados por ${laMult()} (visor X${laMult()})` : ''}. Corrija o que divergir e marque “Conferido”; só os marcados são gravados.</p>
+  box.innerHTML = `<p class="note">Compare cada número com o recorte do visor (toque no recorte para ver a foto inteira)${laAuto() ? '. Escala automática: onde o X10 foi reconhecido o valor já está ×10; cartões em laranja não tiveram a escala confirmada — se o visor mostrar X10, toque em ×10' : laMult() > 1 ? `. Os valores já estão multiplicados por ${laMult()} (visor X${laMult()})` : ''}. Corrija o que divergir e marque “Conferido”; só os marcados são gravados.</p>
     <div class="actions"><button class="btn ghost small" type="button" id="lfgTodos">Marcar todos com valor</button><button class="btn primary" type="button" id="lfgGravar">Gravar conferidos</button><span class="note" id="lfgSt" style="margin:0"></span></div>
     <div class="lfg">${cards.join('')}</div>`;
   $('lfgTodos').onclick = () => box.querySelectorAll('.lfg-card').forEach(cd => { if (cd.querySelector('.lfg-in input').value.trim() !== '') { cd.querySelector('.lfg-ok input').checked = true; cd.classList.add('ok'); } });
@@ -3245,6 +3457,16 @@ $('lfGrade').addEventListener('click', e => {
   const im = e.target.closest('.lfg-card img'); if (!im) return;
   const p = state.pontos.find(x => x.id === im.closest('.lfg-card').dataset.id); if (!p || !p.foto) return;
   if (im.classList.toggle('full')) { im.dataset.min = im.src; im.src = p.foto; } else if (im.dataset.min) im.src = im.dataset.min;
+});
+$('lfGrade').addEventListener('click', e => {
+  const bt = e.target.closest('.lfg-x10'); if (!bt) return;
+  const cd = bt.closest('.lfg-card'), inp = cd.querySelector('.lfg-in input'), m0 = Number(cd.dataset.m) || 1, m = m0 === 10 ? 1 : 10;
+  let base = cd.dataset.lido !== '' ? Number(cd.dataset.lido) : NaN;
+  if (!isFinite(base)) { const v = luxDoCampo(inp.value); if (isFinite(v)) base = v / m0; }
+  if (isFinite(base)) inp.value = laNum(Math.round(base * m * 1000) / 1000);
+  cd.dataset.m = String(m); bt.classList.toggle('on', m === 10); bt.setAttribute('aria-pressed', String(m === 10));
+  cd.classList.remove('esc'); const ch = cd.querySelector('.lfg-esc'); if (ch) { ch.className = 'lfg-esc ok'; ch.textContent = m === 10 ? 'escala ajustada · ×10' : 'escala ajustada · ×1'; }
+  cd.querySelector('.lfg-ok input').checked = true; cd.classList.add('ok');
 });
 $('lfGrade').addEventListener('input', e => {
   const cd = e.target.closest('.lfg-card'); if (!cd) return;
@@ -3260,7 +3482,8 @@ async function lfGravarGrade(){
     if (!isFinite(v) || v < 0 || v > 200000) { inval++; cd.classList.add('err'); continue; }
     p.lux = Math.round(v * 1000) / 1000; if (!p.hora) p.hora = new Date().toISOString(); delete p.auto; delete p.imp; delete p.ocr;
     if (p.sug != null && Math.abs(p.sug - p.lux) < 1e-9) p.lidoPor = p.sugOrig; else delete p.lidoPor;
-    delete p.sug; delete p.sugOrig; delete p.sugInf; n++;
+    const mc = Number(cd.dataset.m) || 1; if (mc !== 1) p.esc = mc; else delete p.esc;   // escala do visor usada no ponto
+    delete p.sug; delete p.sugOrig; delete p.sugInf; delete p.sugEsc; delete p.sugLido; delete p.lfTent; delete p.iaPend; n++;
   }
   if (!n) { $('lfgSt').textContent = inval ? `${inval} valor(es) inválido(s) marcados em vermelho.` : 'Nenhum ponto marcado como conferido.'; return; }
   renderTudo(); await salvar({medicao:true}); renderLevs();
@@ -3269,8 +3492,9 @@ async function lfGravarGrade(){
 }
 $('lfGradeBtn').onclick = lfMontarGrade;
 $('lfIr').onclick = lerLote;
-$('lfModo').onchange = () => { $('lfKeyWrap').hidden = $('lfModo').value !== 'ia'; };
-$('lfKeyWrap').hidden = $('lfModo').value !== 'ia';
+const lfChaveVis = () => { $('lfKeyWrap').hidden = $('lfModo').value !== 'ia' && !$('lfFundoIA').checked; };   // a chave serve ao lote por IA e à IA em campo
+$('lfModo').onchange = lfChaveVis;
+lfChaveVis();
 try { $('lfKey').value = localStorage.getItem(LS_KEY) || ''; } catch (e) {}
 
 restaurar().catch(e => { mostrarFalha(e && e.message || String(e)); if (!state.id) gerar(true, true); });
