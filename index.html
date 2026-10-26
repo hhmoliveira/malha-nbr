@@ -5,10 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0d4f83">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Malha 5101">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Malha NBR 5101">
 <title>Malha de Medição NBR 5101 (leve)</title>
@@ -325,12 +327,13 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
   <div class="lf">
     <h3 style="margin-top:0">Leitura das fotos (escritório)</h3>
     <div class="grid">
-      <div class="fld"><label for="lfModo">Método</label><select id="lfModo"><option value="ia">IA online (chave de API)</option><option value="local">Leitura local do visor (sem internet)</option></select></div>
+      <div class="fld"><label for="lfModo">Método</label><select id="lfModo"><option value="local">Leitura local do visor (sem internet)</option><option value="ia">IA online (chave de API)</option></select></div>
       <div class="fld" id="lfKeyWrap"><label for="lfKey">Chave de API</label><input id="lfKey" type="password" autocomplete="off" placeholder="sk-ant-…"></div>
     </div>
-    <div class="actions"><button class="btn primary" id="lfIr">Ler valores das fotos</button></div>
+    <div class="actions"><button class="btn primary" id="lfIr">Ler valores das fotos</button><button class="btn ghost" id="lfGradeBtn" type="button">Conferir em grade</button></div>
     <p class="note" id="lfSt"></p>
-    <p class="note">A leitura só sugere o valor de cada ponto com foto e sem valor. Nada entra na conformidade até você conferir a foto e confirmar, ponto a ponto, em “Conferir fotos”.</p>
+    <p class="note">A leitura só sugere o valor de cada ponto com foto e sem valor. Nada entra na conformidade até você conferir e confirmar, na grade ou ponto a ponto em “Conferir fotos”. Se o visor mostrar X10, escolha o multiplicador em “Leitura automática do luxímetro” antes de ler.</p>
+    <div id="lfGrade" hidden></div>
   </div>
   <p class="note">O CSV abre direto no Excel (separador “;” e vírgula decimal). Para guardar ou continuar o trabalho em outro aparelho, use “Salvar arquivo no aparelho”.</p>
 </section>
@@ -1572,7 +1575,7 @@ async function salvarPonto(irProx){
   }
   const p = state.pontos[sel], idx = sel;
   p.lux = Math.round(v*1000)/1000; p.hora = new Date().toISOString(); delete p.auto; delete p.imp;
-  if (p.sug != null) { if (Math.abs(p.sug - p.lux) < 1e-9) p.lidoPor = p.sugOrig; else delete p.lidoPor; delete p.sug; delete p.sugOrig; } else delete p.lidoPor;
+  if (p.sug != null) { if (Math.abs(p.sug - p.lux) < 1e-9) p.lidoPor = p.sugOrig; else delete p.lidoPor; delete p.sug; delete p.sugOrig; delete p.sugInf; } else delete p.lidoPor;
   if (LA.conf && LA.conf.id === p.id && Math.abs(LA.conf.v - v) < 1e-9) p.ocr = true; else delete p.ocr;
   if (fotoTemp !== undefined) { p.foto = fotoTemp; fotoPut(p.id, fotoTemp); }
   const prox = irProx ? proximoPendente(idx) : null;
@@ -1585,7 +1588,7 @@ async function apagarPonto(){
   if (sel == null) return;
   const p = state.pontos[sel];
   if (!(await confirmar(`Apagar ${p.lux == null ? 'a foto' : 'a medição'} do ponto ${nro(p)}?`, 'Apagar', 'danger'))) return;
-  p.lux = null; p.foto = null; p.hora = null; delete p.auto; delete p.imp; delete p.ocr; delete p.sug; delete p.sugOrig; delete p.lidoPor; fotoPut(p.id, null);
+  p.lux = null; p.foto = null; p.hora = null; delete p.auto; delete p.imp; delete p.ocr; delete p.sug; delete p.sugOrig; delete p.sugInf; delete p.lidoPor; fotoPut(p.id, null);
   fechar(); renderTudo(); await salvar(); renderLevs();
 }
 
@@ -1621,8 +1624,9 @@ async function laAutoPreencher(src){
   const vivo = () => !$('modal').hidden && sel != null && state.pontos[sel] && state.pontos[sel].id === id;
   nota.textContent = 'Lendo o valor do visor na foto…';
   await new Promise(res => setTimeout(res, 30));
-  let r = laLerGirando(src);
-  if (r.valor == null) {
+  let r = laLerVisor(src);
+  if (r.valor == null && !r.visor) r = laLerGirando(src);
+  if (r.valor == null && !r.visor) {   // visor achado e não lido: não insiste com a busca por janelas (lenta e pode ler um pedaço do visor)
     const b0 = LA.busca;
     const achou = await laProcurar(src, f => { if (vivo()) nota.textContent = `Procurando o visor na foto… ${Math.round(f * 100)}%`; }, vivo);
     if (!vivo() || LA.busca !== b0) return;
@@ -1641,7 +1645,7 @@ async function laAutoPreencher(src){
     return;
   }
   $('lux').value = laNum(v) + ' ' + unid(p); $('luxErr').hidden = true; LA.conf = {id, v};
-  nota.textContent = `Valor lido do visor: ${txt}${laMult() === 1 ? '' : ' (multiplicador do visor)'}. Confira com o display e toque em Salvar.`;
+  nota.textContent = `Valor lido do visor: ${txt}${laMult() === 1 ? '' : ' (multiplicador do visor)'}${r.inferido ? ' — ponto decimal inferido (borrado na foto)' : ''}. Confira com o display e toque em Salvar.`;
   toast(`Leitura ${txt} preenchida. Confira e salve.`);
 }
 function lerArquivoFoto(file){
@@ -2521,7 +2525,10 @@ function laDecodificar(gray, W, H){
     for (let i = 0; i < gray.length; i++) { if (gray[i] < med - d) fd++; else if (gray[i] > med + d) fl++; }
     pol = fd >= fl ? 'dark' : 'light';
   }
-  return {...res, ...laTentar(gray, W, H, rng, pol)};
+  const t = laTentar(gray, W, H, rng, pol);
+  /* o visor do luxímetro sempre mostra ao menos 2 dígitos (ex.: 0.0, 40.9): um dígito só é pedaço do visor ou ruído */
+  if (t.valor != null && String(t.texto).replace('.', '').length < 2) return {...res, ...t, valor:null, falha:'digitos'};
+  return {...res, ...t};
 }
 function laAnalisarFonte(src, sw, sh){
   const roi = LA.cal.roi, rx = Math.max(0, Math.round(roi.x * sw)), ry = Math.max(0, Math.round(roi.y * sh)), rw = Math.min(sw - rx, Math.round(roi.w * sw)), rh = Math.min(sh - ry, Math.round(roi.h * sh));
@@ -2717,9 +2724,268 @@ function laLerGirando(img){
   }
   return r0;
 }
+/* ---------- Localização automática do visor (LCD) ----------
+   Antes de ler os segmentos, acha o visor na foto: um retângulo claro dentro do corpo escuro do luxímetro
+   (ou, sem corpo escuro bem definido, o maior retângulo claro que não encosta na borda da foto). Do visor,
+   separa a linha principal (a de cima, do LX; a de baixo é a temperatura) e entrega só ela ao decodificador de
+   7 segmentos. Se o visor não for achado, segue o fluxo antigo (região salva, giro e busca por janelas). */
+function laOtsu(h, n){
+  let sum = 0; for (let i = 0; i < 256; i++) sum += i * h[i];
+  let wB = 0, sB = 0, best = -1, t = 0;
+  for (let i = 0; i < 256; i++) {
+    wB += h[i]; if (!wB) continue; const wF = n - wB; if (!wF) break;
+    sB += i * h[i]; const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) * (mB - mF);
+    if (v > best) { best = v; t = i; }
+  }
+  return t;
+}
+function laPct(h, n, q){ let a = 0; for (let i = 0; i < 256; i++) { a += h[i]; if (a >= n * q) return i; } return 255; }
+function laDil(m, W, H){ const o = new Uint8Array(m.length);
+  for (let y = 0, i = 0; y < H; y++) for (let x = 0; x < W; x++, i++) o[i] = (m[i] || (x > 0 && m[i-1]) || (x < W-1 && m[i+1]) || (y > 0 && m[i-W]) || (y < H-1 && m[i+W])) ? 1 : 0;
+  return o; }
+function laEro(m, W, H){ const o = new Uint8Array(m.length);
+  for (let y = 0, i = 0; y < H; y++) for (let x = 0; x < W; x++, i++) o[i] = (m[i] && x > 0 && m[i-1] && x < W-1 && m[i+1] && y > 0 && m[i-W] && y < H-1 && m[i+W]) ? 1 : 0;
+  return o; }
+function laFechar(m, W, H, k){ for (let i = 0; i < k; i++) m = laDil(m, W, H); for (let i = 0; i < k; i++) m = laEro(m, W, H); return m; }
+function laPreencher(m, W, H){   // fecha os buracos: fundo que não alcança a borda vira 1
+  const fora = new Uint8Array(m.length), fila = new Int32Array(m.length); let a = 0, b = 0;
+  const add = i => { if (!m[i] && !fora[i]) { fora[i] = 1; fila[b++] = i; } };
+  for (let x = 0; x < W; x++) { add(x); add((H-1)*W + x); } for (let y = 0; y < H; y++) { add(y*W); add(y*W + W-1); }
+  while (a < b) { const i = fila[a++], x = i % W; if (x > 0) add(i-1); if (x < W-1) add(i+1); if (i >= W) add(i-W); if (i < (H-1)*W) add(i+W); }
+  const o = new Uint8Array(m.length); for (let i = 0; i < m.length; i++) o[i] = fora[i] ? 0 : 1; return o;
+}
+function laMelhorRet(m, W, H){   // maior componente com cara de visor: não encosta na borda, proporção 0,9–1,8 (alt/larg), cheia ≥ 85 %
+  const lab = new Int32Array(m.length), fila = new Int32Array(m.length); let best = null, id = 0;
+  for (let s = 0; s < m.length; s++) {
+    if (!m[s] || lab[s]) continue; id++; let a = 0, b = 0, x0 = W, y0 = H, x1 = 0, y1 = 0; lab[s] = id; fila[b++] = s;
+    while (a < b) { const i = fila[a++], x = i % W, y = (i / W) | 0;
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      for (const j of [x > 0 ? i-1 : -1, x < W-1 ? i+1 : -1, y > 0 ? i-W : -1, y < H-1 ? i+W : -1]) if (j >= 0 && m[j] && !lab[j]) { lab[j] = id; fila[b++] = j; } }
+    const w = x1 - x0 + 1, h = y1 - y0 + 1, area = b;
+    if (x0 <= 2 || y0 <= 2 || x1 + 1 >= W - 2 || y1 + 1 >= H - 2 || w < 25) continue;
+    if (h / w <= .9 || h / w >= 1.8 || area / (w * h) < .85) continue;
+    if (!best || area > best.area) best = {area, x:x0, y:y0, w, h};
+  }
+  return best;
+}
+function laAcharVisor(src){
+  const iw = src.naturalWidth || src.videoWidth || src.width, ih = src.naturalHeight || src.videoHeight || src.height; if (!iw || !ih) return null;
+  const k = 600 / Math.max(iw, ih), W = Math.max(1, Math.round(iw * k)), H = Math.max(1, Math.round(ih * k)), n = W * H;
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d', {willReadFrequently:true}); g.drawImage(src, 0, 0, W, H);
+  const d = g.getImageData(0, 0, W, H).data, V = new Uint8Array(n), S = new Uint8Array(n), hV = new Float64Array(256), hS = new Float64Array(256);
+  for (let i = 0; i < n; i++) { const r = d[i*4], gg = d[i*4+1], bb = d[i*4+2], mx = Math.max(r, gg, bb), mn = Math.min(r, gg, bb);
+    V[i] = mx; S[i] = mx ? Math.round((mx - mn) * 255 / mx) : 0; hV[V[i]]++; hS[S[i]]++; }
+  const tV = laOtsu(hV, n), tS = laOtsu(hS, n), masc = [];
+  for (const t of [...new Set([tV, ...[.15, .25, .35, .45, .55].map(q => laPct(hV, n, q))])].sort((a, b) => a - b)) {
+    const corpo = new Uint8Array(n); for (let i = 0; i < n; i++) corpo[i] = V[i] < t ? 1 : 0;
+    const cf = laFechar(corpo, W, H, 1), cheio = laPreencher(cf, W, H), furo = new Uint8Array(n);
+    for (let i = 0; i < n; i++) furo[i] = cheio[i] && !cf[i] ? 1 : 0; masc.push(furo);
+  }
+  const claro = new Uint8Array(n), claroNeutro = new Uint8Array(n);
+  for (let i = 0; i < n; i++) { claro[i] = V[i] > tV ? 1 : 0; claroNeutro[i] = claro[i] && S[i] < tS ? 1 : 0; }
+  masc.push(claro, claroNeutro);
+  for (const m0 of masc) {
+    const r = laMelhorRet(laPreencher(laFechar(m0, W, H, 2), W, H), W, H);
+    if (r) return {x:r.x / k, y:r.y / k, w:r.w / k, h:r.h / k};
+  }
+  return null;
+}
+function laLinhaVisor(src, bx){   // linha principal (de cima) dentro do visor, em pixels da foto
+  const Wt = 400, Ht = Math.max(8, Math.round(400 * bx.h / bx.w)), c = document.createElement('canvas'); c.width = Wt; c.height = Ht;
+  const g = c.getContext('2d', {willReadFrequently:true}); g.drawImage(src, bx.x, bx.y, bx.w, bx.h, 0, 0, Wt, Ht);
+  const d = g.getImageData(0, 0, Wt, Ht).data, n = Wt * Ht, gr = new Uint8Array(n), h = new Float64Array(256);
+  for (let i = 0; i < n; i++) { gr[i] = Math.round(.299 * d[i*4] + .587 * d[i*4+1] + .114 * d[i*4+2]); h[gr[i]]++; }
+  const t = laOtsu(h, n), mg = Math.floor(.04 * Wt), cw = Math.floor(.85 * Wt), prof = new Float64Array(Ht);   // ignora margens e a coluna de LX/°C
+  for (let y = 0; y < Ht; y++) { let k = 0; for (let x = mg; x < cw; x++) if (gr[y*Wt + x] < t) k++; prof[y] = k / cw; }
+  const linhas = lim => { const s = []; let ini = -1;
+    for (let y = 0; y <= Ht; y++) { const on = y < Ht && prof[y] > lim && prof[y] < .8;   // ≥ 80 % de tinta: moldura escura, não dígito
+      if (on && ini < 0) ini = y; else if (!on && ini >= 0) { if (y - ini > Ht * .12) s.push([ini, y]); ini = -1; } }
+    return s; };
+  /* foto pequena ou desfocada: as duas linhas do visor se encostam; sobe o limiar até separar a linha do lux da temperatura */
+  const par = s => s.length >= 2 && (s[0][1] - s[0][0]) / (s[1][1] - s[1][0]) > .6 && (s[0][1] - s[0][0]) / (s[1][1] - s[1][0]) < 1.6;   // lux e °C têm alturas parecidas
+  let segs = linhas(.06);
+  if (!par(segs)) for (const lim of [.09, .12, .16, .2]) { const s = linhas(lim); if (par(s)) { segs = s; break; } }
+  if (!segs.length) return null;
+  const [a, b] = segs[0], pad = Math.floor((b - a) * .2), y0 = Math.max(0, a - pad), y1 = Math.min(Ht, b + pad), s = bx.h / Ht;
+  return {x:bx.x, y:bx.y + y0 * s, w:bx.w, h:(y1 - y0) * s};
+}
+/* ---------- Leitura do visor v2 (calibrada com 139 fotos noturnas de campo, Arujá/SP) ----------
+   1) acha o visor como o maior retângulo claro (ou o furo claro no corpo escuro), mede a inclinação pelo retângulo
+      mínimo e endireita o recorte (até 90°; acima de 50° testa os dois sentidos e só aceita se concordarem);
+   2) usa o canal vermelho (dígitos azuis somem menos no brilho) com contraste esticado pelo miolo do visor;
+   3) tira a faixa de ícones (HOLD) e tenta várias versões do recorte (escala, nitidez, curva de contraste);
+   4) só aceita se todas as versões que leram concordarem, a linha lida estiver na metade de cima do visor
+      (embaixo é a temperatura), o último dígito estiver alinhado à direita (junto do LX) e o formato for o do visor
+      (uma casa decimal). Ponto decimal apagado pelo borrão é inferido (o visor sempre tem 1 casa) e fica marcado. */
+function vzMascaras(src){
+  const iw = src.naturalWidth || src.videoWidth || src.width, ih = src.naturalHeight || src.videoHeight || src.height;
+  const k = 500 / Math.max(iw, ih), W = Math.max(1, Math.round(iw * k)), H = Math.max(1, Math.round(ih * k)), n = W * H;
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d', {willReadFrequently:true}); g.drawImage(src, 0, 0, W, H);
+  const d = g.getImageData(0, 0, W, H).data, V = new Uint8Array(n), S = new Uint8Array(n), hV = new Float64Array(256), hS = new Float64Array(256);
+  for (let i = 0; i < n; i++) { const r = d[i*4], gg = d[i*4+1], bb = d[i*4+2], mx = Math.max(r, gg, bb), mn = Math.min(r, gg, bb);
+    V[i] = mx; S[i] = mx ? Math.round((mx - mn) * 255 / mx) : 0; hV[V[i]]++; hS[S[i]]++; }
+  const tV = laOtsu(hV, n), tS = laOtsu(hS, n), masc = [];
+  const claro = new Uint8Array(n); for (let i = 0; i < n; i++) claro[i] = V[i] > tV ? 1 : 0;
+  masc.push({m:claro, borda:true});
+  for (const t of [...new Set([tV, ...[.15, .25, .35, .45, .55].map(q => laPct(hV, n, q))])].sort((a, b) => a - b)) {
+    const corpo = new Uint8Array(n); for (let i = 0; i < n; i++) corpo[i] = V[i] < t ? 1 : 0;
+    const cf = laFechar(corpo, W, H, 1), cheio = laPreencher(cf, W, H), furo = new Uint8Array(n);
+    for (let i = 0; i < n; i++) furo[i] = cheio[i] && !cf[i] ? 1 : 0; masc.push({m:furo, borda:false});
+  }
+  const cn = new Uint8Array(n); for (let i = 0; i < n; i++) cn[i] = claro[i] && S[i] < tS ? 1 : 0; masc.push({m:cn, borda:false});
+  return {masc, W, H, k};
+}
+function vzComponentes(m, W, H){
+  const lab = new Int32Array(m.length), fila = new Int32Array(m.length), out = []; let id = 0;
+  for (let s = 0; s < m.length; s++) {
+    if (!m[s] || lab[s]) continue; id++; let a = 0, b = 0; lab[s] = id; fila[b++] = s;
+    while (a < b) { const i = fila[a++], x = i % W, y = (i / W) | 0;
+      if (x > 0 && m[i-1] && !lab[i-1]) { lab[i-1] = id; fila[b++] = i-1; } if (x < W-1 && m[i+1] && !lab[i+1]) { lab[i+1] = id; fila[b++] = i+1; }
+      if (y > 0 && m[i-W] && !lab[i-W]) { lab[i-W] = id; fila[b++] = i-W; } if (y < H-1 && m[i+W] && !lab[i+W]) { lab[i+W] = id; fila[b++] = i+W; } }
+    if (b < W * H * .01) continue;
+    const pts = []; let toca = 0;
+    for (let j = 0; j < b; j++) { const i = fila[j], x = i % W, y = (i / W) | 0;
+      const bd = x === 0 || y === 0 || x === W-1 || y === H-1 || lab[i-1] !== id || lab[i+1] !== id || lab[i-W] !== id || lab[i+W] !== id;
+      if (bd) { pts.push(x, y); if (x <= 1 || y <= 1 || x >= W-2 || y >= H-2) toca++; } }
+    out.push({area:b, pts, toca});
+  }
+  return out;
+}
+function vzRetMin(pts){
+  let best = null;
+  for (let a = 0; a < 90; a++) { const t = a * Math.PI / 180, c = Math.cos(t), s = Math.sin(t); let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9;
+    for (let j = 0; j < pts.length; j += 2) { const x = pts[j], y = pts[j+1], u = x*c + y*s, v = -x*s + y*c; if (u < u0) u0 = u; if (u > u1) u1 = u; if (v < v0) v0 = v; if (v > v1) v1 = v; }
+    const A = (u1 - u0) * (v1 - v0); if (!best || A < best.A) best = {A, a, u0, u1, v0, v1}; }
+  const t = best.a * Math.PI / 180, c = Math.cos(t), s = Math.sin(t), uc = (best.u0 + best.u1) / 2, vc = (best.v0 + best.v1) / 2;
+  let w = best.u1 - best.u0, h = best.v1 - best.v0, ang = best.a;
+  if (w > h) { [w, h] = [h, w]; ang += 90; }        // deixa o visor "em pé" (mais alto que largo)
+  if (ang > 90) ang -= 180;                          // ângulo de giro em (-90, 90]
+  return {cx:uc*c - vc*s, cy:uc*s + vc*c, w, h, ang, A:best.A};
+}
+/* candidatos de visor (em pixels da foto): retângulo girado, cheio, proporção de visor */
+function vzAcharVisores(src){
+  const {masc, W, H, k} = vzMascaras(src), res = [];
+  for (const {m, borda} of masc) {
+    const mm = laPreencher(laFechar(m, W, H, 2), W, H), cs = vzComponentes(mm, W, H); let best = null;
+    for (const cpt of cs) {
+      if (!borda && cpt.toca) continue;
+      if (cpt.toca > cpt.pts.length / 2 * .25) continue;   // encosta muito na borda da foto
+      const r = vzRetMin(cpt.pts), fill = cpt.area / r.A, ar = r.h / r.w;
+      if (r.w < 20 || fill < .8 || ar < 1.02 || ar > 1.9) continue;
+      if (!best || cpt.area > best.area) best = {...r, area:cpt.area, fill};
+    }
+    if (best) res.push({cx:best.cx / k, cy:best.cy / k, w:best.w / k, h:best.h / k, ang:best.ang, fill:best.fill});
+  }
+  return res;
+}
+/* visor endireitado num canvas (canal vermelho esticado em tons de cinza) */
+function vzRecorte(src, v, rot){
+  const s = 400 / v.w, Wc = 400, Hc = Math.round(v.h * s), c = document.createElement('canvas'); c.width = Wc; c.height = Hc;
+  const g = c.getContext('2d', {willReadFrequently:true}); g.fillStyle = '#fff'; g.fillRect(0, 0, Wc, Hc);
+  g.translate(Wc / 2, Hc / 2); g.rotate(-rot * Math.PI / 180); g.scale(s, s); g.translate(-v.cx, -v.cy); g.imageSmoothingQuality = 'high'; g.drawImage(src, 0, 0);
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  const im = g.getImageData(0, 0, Wc, Hc), d = im.data, n = Wc * Hc, h = new Float64Array(256);
+  let nn = 0; for (let y = Math.round(Hc * .12); y < Hc * .88; y++) for (let x = Math.round(Wc * .12); x < Wc * .88; x++) { h[d[(y*Wc + x)*4]]++; nn++; }   // contraste medido no miolo do visor (sem a moldura preta)
+  const lo = laPct(h, nn, .01), hi = laPct(h, nn, .99), sc = 255 / Math.max(1, hi - lo);
+  for (let i = 0; i < n; i++) { const r = Math.max(0, Math.min(255, Math.round((d[i*4] - lo) * sc))); d[i*4] = d[i*4+1] = d[i*4+2] = r; }
+  g.putImageData(im, 0, 0); return c;
+}
+function vzMiolo(c, f, limpar){   // apara a borda do recorte (moldura e brilho em volta)
+  const x = Math.round(c.width * f), y = Math.round(c.height * f * .7), o = document.createElement('canvas'); o.width = c.width - 2 * x; o.height = c.height - 2 * y; o.__y0 = y / c.height; o.__hf = o.height / c.height;
+  const g = o.getContext('2d', {willReadFrequently:true}); g.drawImage(c, x, y, o.width, o.height, 0, 0, o.width, o.height);
+  if (!limpar) return o;
+  /* apaga o que é escuro e está ligado à borda (resto da moldura, sombra do brilho): não é dígito */
+  const W = o.width, H = o.height, n = W * H, im = g.getImageData(0, 0, W, H), d = im.data, hh = new Float64Array(256);
+  for (let i = 0; i < n; i++) hh[d[i*4]]++;
+  const t = laOtsu(hh, n), seen = new Uint8Array(n), fila = new Int32Array(n); let a = 0, b = 0;
+  const add = i => { if (!seen[i] && d[i*4] < t) { seen[i] = 1; fila[b++] = i; } };
+  for (let xx = 0; xx < W; xx++) { add(xx); add((H-1)*W + xx); } for (let yy = 0; yy < H; yy++) { add(yy*W); add(yy*W + W-1); }
+  while (a < b) { const i = fila[a++], xx = i % W; if (xx > 0) add(i-1); if (xx < W-1) add(i+1); if (i >= W) add(i-W); if (i < n-W) add(i+W); }
+  for (let i = 0; i < n; i++) if (seen[i]) d[i*4] = d[i*4+1] = d[i*4+2] = 255;
+  g.putImageData(im, 0, 0); return o;
+}
+function vzLinhaTopo(c){   // reaproveita a separação de linhas do visor
+  const ln = laLinhaVisor(c, {x:0, y:0, w:c.width, h:c.height}); if (!ln || ln.h < 10) return null;
+  const o = document.createElement('canvas'); o.width = Math.round(ln.w); o.height = Math.round(ln.h);
+  o.getContext('2d').drawImage(c, ln.x, ln.y, ln.w, ln.h, 0, 0, o.width, o.height); return o;
+}
+function vzDecodificar(c){
+  const roi0 = LA.cal.roi, pol0 = LA.cal.pol; let r = {falha:'digitos'};
+  LA.cal.pol = 'dark';   // no recorte preparado (canal vermelho) os dígitos são sempre escuros
+  try { for (const roi of [{x:0, y:0, w:1, h:1}, {x:.02, y:.05, w:.85, h:.9}]) { LA.cal.roi = roi; r = laAnalisarFonte(c, c.width, c.height); if (r.valor != null) break; } }
+  finally { LA.cal.roi = roi0; LA.cal.pol = pol0; }
+  return r;
+}
+/* formato do visor: sempre com uma casa decimal (0.0 a 1999.9); sem ponto só com 4 dígitos ou mais */
+function vzEscala(c, k){ const o = document.createElement('canvas'); o.width = Math.max(20, Math.round(c.width * k)); o.height = Math.max(10, Math.round(c.height * k));
+  const g = o.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(c, 0, 0, o.width, o.height); o.__y0 = c.__y0 || 0; o.__hf = c.__hf || 1; return o; }
+function vzNitidez(c, r){   // máscara de nitidez: original + (original - borrado)
+  const W = c.width, H = c.height, o = document.createElement('canvas'); o.width = W; o.height = H; const g = o.getContext('2d', {willReadFrequently:true});
+  g.filter = `blur(${r}px)`; g.drawImage(c, 0, 0); g.filter = 'none';
+  const b = g.getImageData(0, 0, W, H), a = c.getContext('2d', {willReadFrequently:true}).getImageData(0, 0, W, H), d = a.data, e = b.data;
+  for (let i = 0; i < d.length; i += 4) { const v = Math.max(0, Math.min(255, 2 * d[i] - e[i])); d[i] = d[i+1] = d[i+2] = v; }
+  g.putImageData(a, 0, 0); o.__y0 = c.__y0 || 0; o.__hf = c.__hf || 1; return o; }
+/* tira a faixa de cima do visor (ícones HOLD, relógio, bateria): corta na primeira linha vazia acima dos dígitos */
+function vzSemHold(c){
+  /* do topo para baixo: pula linhas vazias, acha a 1ª faixa de tinta; se for baixa (ícones, < 9 % da altura), corta logo abaixo dela */
+  const W = c.width, H = c.height, d = c.getContext('2d', {willReadFrequently:true}).getImageData(0, 0, W, H).data, hh = new Float64Array(256);
+  for (let i = 0; i < W * H; i++) hh[d[i*4]]++;
+  const t = laOtsu(hh, W * H), x0 = Math.round(W * .05), x1 = Math.round(W * .85), ink = y => { let k = 0; for (let x = x0; x < x1; x++) if (d[(y*W + x)*4] < t) k++; return k / (x1 - x0); };
+  let y = Math.round(H * .02); while (y < H * .3 && ink(y) <= .015) y++;
+  const a = y; while (y < H * .35 && ink(y) > .015) y++;
+  if (y - a <= 0 || y - a >= H * .09 || y >= H * .35) return null;
+  let b = y; while (b < H * .4 && ink(b) <= .015) b++;   // vão entre o ícone e os dígitos
+  const cut = Math.max(y, Math.round((y + b) / 2) - 2);
+  const o = document.createElement('canvas'); o.width = W; o.height = H - cut; o.getContext('2d').drawImage(c, 0, cut, W, H - cut, 0, 0, W, H - cut);
+  o.__y0 = cut / H; return o;
+}
+function vzGama(c, gm){   // clareia os tons médios: só o miolo escuro dos segmentos continua tinta (separa dígitos borrados)
+  const W = c.width, H = c.height, o = document.createElement('canvas'); o.width = W; o.height = H; const g = o.getContext('2d', {willReadFrequently:true});
+  const a = c.getContext('2d', {willReadFrequently:true}).getImageData(0, 0, W, H), d = a.data, lut = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) lut[i] = Math.round(255 * Math.pow(i / 255, gm));
+  for (let i = 0; i < d.length; i += 4) d[i] = d[i+1] = d[i+2] = lut[d[i]];
+  g.putImageData(a, 0, 0); o.__y0 = c.__y0 || 0; o.__hf = c.__hf || 1; return o; }
+function vzFormatoOk(t){ return /^\d{1,4}\.\d$/.test(t); }
+function laLerVisor(src){
+  let cands = []; try { cands = vzAcharVisores(src); } catch (e) {}
+  if (!cands.length) return {falha:'digitos', visor:false};
+  const vistos = new Map();
+  for (const v of cands) {
+    const rots = Math.abs(v.ang) <= 50 ? [v.ang] : [v.ang, v.ang > 0 ? v.ang - 180 : v.ang + 180];
+    const lidos = [];
+    for (const rot of rots) {
+      const c = vzRecorte(src, v, rot);
+      const m6 = vzMiolo(c, .06), m10 = vzMiolo(c, .1), sh = vzSemHold(m6);
+      if (sh) { sh.__y0 = m6.__y0 + sh.__y0 * m6.__hf; sh.__hf = sh.height / m6.height * m6.__hf; }
+      const fontes = [() => sh, () => sh && vzEscala(sh, .6), () => sh && vzNitidez(sh, 4), () => sh && vzGama(sh, .5), () => sh && vzGama(sh, .3), () => vzGama(m6, .5), () => vzGama(m6, .3), () => sh && vzGama(vzEscala(sh, .6), .4), () => m6, () => m10, () => vzMiolo(c, .06, true), () => vzEscala(m6, .6), () => vzEscala(m6, .4), () => vzNitidez(m6, 4), () => vzNitidez(vzEscala(m6, .6), 3), () => vzEscala(vzNitidez(m6, 6), .5), () => vzLinhaTopo(m6)];
+      const aqui = [];
+      for (const fonte of fontes) {
+        const f = fonte(); if (!f) continue; const r = vzDecodificar(f);
+        if (r.valor == null || !r.prev || !r.prev.digs || !r.prev.digs.length) continue;
+        if (f.__hf != null && r.prev.band) {   // a linha lida tem de estar na metade de cima do visor (embaixo é a temperatura)
+          const Hs = f.height * Math.min(360, f.width) / f.width, cy = f.__y0 + (r.prev.band[0] + r.prev.band[1]) / 2 / Hs * f.__hf; if (cy > .5) continue; }
+        /* os dígitos do lux ficam alinhados à direita, junto do "LX": se o último termina antes de 75 % da largura, falta dígito */
+        const Wd = Math.min(360, f.width), pad = (r.prev.W2 - Wd) / 2, ult = r.prev.digs[r.prev.digs.length - 1], rx = (ult.x1 - pad) / Wd;
+        if (rx < .75) continue;
+        let texto = r.texto, inferido = false;
+        if (/^\d{2,4}$/.test(texto)) { texto = texto.slice(0, -1) + '.' + texto.slice(-1); inferido = true; }   // ponto decimal apagado pelo borrão: o visor sempre tem 1 casa
+        if (!vzFormatoOk(texto)) continue;
+        aqui.push({...r, texto, valor:parseFloat(texto), inferido, rot, crop:c});
+      }
+      if (aqui.length) { const tx = new Set(aqui.map(l => l.texto)); if (tx.size === 1) { const comPonto = aqui.find(l => !l.inferido); lidos.push({...(comPonto || aqui[0]), inferido:!comPonto, votos:aqui.length}); } else return {falha:'ambiguo', visor:true, bx:v}; }
+    }
+    const txt = [...new Set(lidos.map(l => l.texto))];
+    if (txt.length === 1) return {...lidos[0], visor:true, bx:v};
+    if (txt.length > 1) return {falha:'ambiguo', visor:true, bx:v};     // dois sentidos dão leituras diferentes: não escolhe
+  }
+  return {falha:'padrao', visor:true, bx:cands[0]};
+}
+
 async function laAnalisarFoto(procurar){
   const img = LA.foto; if (!img) return;
-  const r = laLerGirando(img);
+  let r = procurar ? laLerVisor(img) : null;
+  if (r && r.valor != null && r.roiN) LA.cal.roi = r.roiN;   // a moldura mostra onde o número foi lido
+  if (!r || (r.valor == null && !r.visor)) r = laLerGirando(img);
   if (r.valor != null || !procurar) { laMostrarFoto(r); return; }
   laUI('— lx', 'Procurando o visor na foto…', 0);
   const b0 = LA.busca;
@@ -2778,7 +3044,7 @@ $('btnLimpar').onclick = async () => {
   const med = nMed();
   if (!med) { toast('Nenhuma medição para limpar.'); return; }
   if (!(await confirmar(`Apagar ${med} medição(ões) e fotos deste levantamento?`, 'Apagar', 'danger'))) return;
-  state.pontos.forEach(p => { p.lux = null; p.foto = null; p.hora = null; delete p.auto; delete p.imp; delete p.ocr; delete p.sug; delete p.sugOrig; delete p.lidoPor; }); state.exemplo = false;
+  state.pontos.forEach(p => { p.lux = null; p.foto = null; p.hora = null; delete p.auto; delete p.imp; delete p.ocr; delete p.sug; delete p.sugOrig; delete p.sugInf; delete p.lidoPor; }); state.exemplo = false;
   await fotosApagarLev(state.id); renderTudo(); await salvar(); renderLevs();
 };
 document.querySelectorAll('input[name=calc]').forEach(r => r.onchange = () => { syncCalcUI(); checarDirty(); });
@@ -2879,7 +3145,7 @@ $('btnPacote').onclick = async () => {
    Gera uma SUGESTÃO de valor (p.sug) para cada ponto com foto e sem valor. A sugestão não entra na conformidade:
    só vira medição quando o usuário confere a foto e confirma em "Conferir fotos". */
 document.head.insertAdjacentHTML('beforeend', '<style>.lf{margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:12px}</style>');
-const LF_PROMPT = 'Esta é a foto do display de um luxímetro digital. Leia o valor numérico principal mostrado (a linha de dígitos maiores; ignore temperatura, HOLD, MAX/MIN e a unidade). Responda SOMENTE neste formato, sem mais nada: VALOR=<número com ponto decimal> UNIDADE=<lx|klx|fc|?>. Se algum dígito estiver ilegível, cortado ou ambíguo, responda VALOR=?. Não estime nem complete dígitos.';
+const LF_PROMPT = 'Esta é a foto (muitas vezes noturna, tremida, girada ou com o visor estourado de luz) do visor de 7 segmentos de um luxímetro digital. O visor tem duas linhas de dígitos grandes: a de CIMA é a iluminância (junto de "LX"); a de BAIXO é a temperatura (junto de "°C") e deve ser ignorada. Se a foto estiver girada, leia considerando o visor em pé (ícones HOLD e bateria no topo). Ignore HOLD, MAX/MIN, bateria, indicadores X10/X100 e a unidade; o multiplicador é aplicado depois. O valor de iluminância sempre tem exatamente uma casa decimal (ex.: 4.8, 38.3, 152.3); o dígito 1 ocupa só o lado direito da casa. Responda SOMENTE neste formato, sem mais nada: VALOR=<número com ponto decimal> UNIDADE=<lx|klx|fc|?>. Se algum dígito estiver ilegível, cortado ou ambíguo, responda VALOR=?. Não estime nem complete dígitos.';
 let lfRodando = false, lfParar = false;
 function lfImagem(p){   // foto carimbada -> imagem sem a barra de legenda
   return new Promise((ok, er) => { const im = new Image(); im.onload = () => {
@@ -2904,8 +3170,10 @@ async function lfIA(canvas, key, modelo){
   } finally { clearTimeout(to); }
 }
 async function lfLocal(canvas){
-  let r = laLerGirando(canvas);
-  if (r.valor == null) { const a = await laProcurar(canvas, () => {}, () => true); if (a) r = a.r; }
+  let r = laLerVisor(canvas);
+  if (r.valor == null && !r.visor) r = laLerGirando(canvas);
+  if (r.valor == null && !r.visor) { const a = await laProcurar(canvas, () => {}, () => true); if (a) r = a.r; }   // visor achado e não lido: não chuta com a busca por janelas
+  lfLocal.inferido = !!(r.valor != null && r.inferido);
   return r.valor != null ? r.valor : null;
 }
 async function lerLote(){
@@ -2921,25 +3189,124 @@ async function lerLote(){
     for (const p of alvo) {
       if (lfParar) break; i++; $('lfSt').textContent = `Lendo o ponto ${nro(p)} (${i}/${alvo.length})…`;
       try {
-        const c = await lfImagem(p), v = modo === 'ia' ? await lfIA(c, key, modelo) : await lfLocal(c);
-        if (v != null && v >= 0 && v <= 200000) { p.sug = Math.round(v * 1000) / 1000; p.sugOrig = modo; ok++; } else falha++;
+        const c = await lfImagem(p), lido = modo === 'ia' ? await lfIA(c, key, modelo) : await lfLocal(c), v = lido == null ? null : laReal(lido);   // multiplicador do visor (X10, X100)
+        if (v != null && v >= 0 && v <= 200000) { p.sug = Math.round(v * 1000) / 1000; p.sugOrig = modo; if (modo !== 'ia' && lfLocal.inferido) p.sugInf = true; else delete p.sugInf; ok++; } else falha++;
       } catch (e) { falha++; if (/401|x-api-key|authentication/i.test(String(e && e.message))) { recusada = true; break; } }
       if (i % 5 === 0) { await salvar({semArquivo:true}); renderTabela(); }
     }
   } finally { lfRodando = false; b.textContent = 'Ler valores das fotos'; await salvar({semArquivo:true}); renderTudo(); }
   $('lfSt').textContent = recusada ? 'A chave de API foi recusada. Confira a chave e tente de novo.'
-    : `${ok} leitura(s) sugerida(s), ${falha} sem leitura${lfParar ? ' (interrompido)' : ''}. Toque em “Conferir fotos” para confirmar cada valor.`;
+    : `${ok} leitura(s) sugerida(s), ${falha} sem leitura${lfParar ? ' (interrompido)' : ''}${laMult() > 1 ? ` · multiplicador ×${laMult()} aplicado` : ''}. Confira na grade abaixo ou em “Conferir fotos”.`;
+  if (!recusada) lfMontarGrade();
 }
+/* ---------- Conferência em grade ----------
+   Todos os pontos com foto e sem valor numa grade: recorte do visor, valor sugerido (editável) e “conferido”.
+   Só os marcados como conferidos são gravados. Toque no recorte para ver a foto inteira. */
+document.head.insertAdjacentHTML('beforeend', `<style>
+.lfg{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:10px;margin-top:10px}
+.lfg-card{border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--surface);display:flex;flex-direction:column;gap:6px}
+.lfg-card.ok{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok) inset}.lfg-card.err{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad) inset}
+.lfg-card img{width:100%;height:auto;max-height:240px;object-fit:contain;background:#000;border-radius:6px;cursor:zoom-in}
+.lfg-card img.full{max-height:none;cursor:zoom-out}
+.lfg-row{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:.85rem}
+.lfg-in{display:flex;align-items:center;gap:6px}.lfg-in input{flex:1;min-width:0;padding:8px;font:700 1.05rem var(--f-num, ui-monospace, monospace);border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);text-align:right}
+.lfg-ok{display:flex;align-items:center;gap:8px;font-size:.86rem;font-weight:600;min-height:32px}.lfg-ok input{width:20px;height:20px}
+</style>`);
+async function lfRecorteVisor(p){
+  try {
+    const c = await lfImagem(p), r = laLerVisor(c), v = r.bx && r.bx.ang != null ? r.bx : vzAcharVisores(c)[0]; if (!v) return null;   // o mesmo visor que gerou a leitura
+    const rot = r.rot != null ? r.rot : v.ang;
+    const m = 1.12, k = Math.min(1, 300 / (v.w * m)), Wc = Math.round(v.w * m * k), Hc = Math.round(v.h * m * k), o = document.createElement('canvas'); o.width = Wc; o.height = Hc;
+    const g = o.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, Wc, Hc);
+    g.translate(Wc / 2, Hc / 2); g.rotate(-rot * Math.PI / 180); g.scale(k, k); g.translate(-v.cx, -v.cy); g.drawImage(c, 0, 0);
+    return o.toDataURL('image/jpeg', .85);
+  } catch (e) { return null; }
+}
+async function lfMontarGrade(){
+  const box = $('lfGrade'), lst = state.pontos.filter(p => p.foto && p.lux == null);
+  if (!lst.length) { box.hidden = true; box.innerHTML = ''; return; }
+  box.hidden = false; box.innerHTML = `<p class="note">Montando a grade (${lst.length} foto(s))…</p>`;
+  const cards = [];
+  for (const p of lst) {
+    const rec = await lfRecorteVisor(p), sug = p.sug != null ? laNum(p.sug) : '';
+    cards.push(`<div class="lfg-card" data-id="${p.id}">
+      <img src="${rec || p.foto}" data-rec="${rec ? '1' : ''}" alt="Visor do ponto ${nro(p)}">
+      <div class="lfg-row"><b>Ponto ${nro(p)}</b><span class="note" style="margin:0">${p.sug != null ? (p.sugOrig === 'ia' ? 'sugerido (IA)' : p.sugInf ? 'local · ponto inferido' : 'sugerido (local)') : 'sem leitura'}</span></div>
+      <label class="lfg-in"><input type="text" inputmode="decimal" value="${sug}" placeholder="digite" aria-label="Valor do ponto ${nro(p)}"><span>${unid(p)}</span></label>
+      <label class="lfg-ok"><input type="checkbox"> Conferido</label></div>`);
+  }
+  box.innerHTML = `<p class="note">Compare cada número com o recorte do visor (toque no recorte para ver a foto inteira)${laMult() > 1 ? `. Os valores já estão multiplicados por ${laMult()} (visor X${laMult()})` : ''}. Corrija o que divergir e marque “Conferido”; só os marcados são gravados.</p>
+    <div class="actions"><button class="btn ghost small" type="button" id="lfgTodos">Marcar todos com valor</button><button class="btn primary" type="button" id="lfgGravar">Gravar conferidos</button><span class="note" id="lfgSt" style="margin:0"></span></div>
+    <div class="lfg">${cards.join('')}</div>`;
+  $('lfgTodos').onclick = () => box.querySelectorAll('.lfg-card').forEach(cd => { if (cd.querySelector('.lfg-in input').value.trim() !== '') { cd.querySelector('.lfg-ok input').checked = true; cd.classList.add('ok'); } });
+  $('lfgGravar').onclick = lfGravarGrade;
+}
+$('lfGrade').addEventListener('click', e => {
+  const im = e.target.closest('.lfg-card img'); if (!im) return;
+  const p = state.pontos.find(x => x.id === im.closest('.lfg-card').dataset.id); if (!p || !p.foto) return;
+  if (im.classList.toggle('full')) { im.dataset.min = im.src; im.src = p.foto; } else if (im.dataset.min) im.src = im.dataset.min;
+});
+$('lfGrade').addEventListener('input', e => {
+  const cd = e.target.closest('.lfg-card'); if (!cd) return;
+  if (e.target.type === 'checkbox') cd.classList.toggle('ok', e.target.checked);
+  else { cd.classList.remove('err'); cd.querySelector('.lfg-ok input').checked = true; cd.classList.add('ok'); }   // corrigiu o valor: conta como conferido
+});
+async function lfGravarGrade(){
+  let n = 0, inval = 0;
+  for (const cd of $('lfGrade').querySelectorAll('.lfg-card')) {
+    if (!cd.querySelector('.lfg-ok input').checked) continue;
+    const p = state.pontos.find(x => x.id === cd.dataset.id); if (!p || p.lux != null) continue;
+    const v = luxDoCampo(cd.querySelector('.lfg-in input').value);
+    if (!isFinite(v) || v < 0 || v > 200000) { inval++; cd.classList.add('err'); continue; }
+    p.lux = Math.round(v * 1000) / 1000; if (!p.hora) p.hora = new Date().toISOString(); delete p.auto; delete p.imp; delete p.ocr;
+    if (p.sug != null && Math.abs(p.sug - p.lux) < 1e-9) p.lidoPor = p.sugOrig; else delete p.lidoPor;
+    delete p.sug; delete p.sugOrig; delete p.sugInf; n++;
+  }
+  if (!n) { $('lfgSt').textContent = inval ? `${inval} valor(es) inválido(s) marcados em vermelho.` : 'Nenhum ponto marcado como conferido.'; return; }
+  renderTudo(); await salvar({medicao:true}); renderLevs();
+  toast(`${n} leitura(s) gravada(s)${inval ? `; ${inval} com valor inválido ficaram pendentes` : ''}.`);
+  await lfMontarGrade();
+}
+$('lfGradeBtn').onclick = lfMontarGrade;
 $('lfIr').onclick = lerLote;
 $('lfModo').onchange = () => { $('lfKeyWrap').hidden = $('lfModo').value !== 'ia'; };
+$('lfKeyWrap').hidden = $('lfModo').value !== 'ia';
 try { $('lfKey').value = localStorage.getItem(LS_KEY) || ''; } catch (e) {}
 
 restaurar().catch(e => { mostrarFalha(e && e.message || String(e)); if (!state.id) gerar(true, true); });
 </script>
 <script>
+/* ---------- App instalável (PWA) ----------
+   Service worker: app disponível sem internet; quando houver versão nova publicada, mostra o aviso para atualizar
+   (nunca recarrega sozinho no meio de uma medição). Armazenamento persistente: pede ao navegador para não apagar
+   levantamentos e fotos quando faltar espaço no aparelho. */
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  let recarregar = false;
+  const avisoVersao = reg => {
+    if (document.getElementById('pwaNova')) return;
+    const b = document.createElement('div'); b.id = 'pwaNova'; b.setAttribute('role', 'status');
+    b.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:9999;display:flex;gap:10px;align-items:center;justify-content:space-between;background:#0d4f83;color:#fff;padding:10px 12px;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.3);font:600 14px system-ui,sans-serif';
+    b.innerHTML = '<span>Nova versão do app disponível.</span><span style="display:flex;gap:8px"><button type="button" id="pwaDepois" style="min-height:40px;padding:0 12px;border-radius:8px;border:1px solid rgba(255,255,255,.5);background:transparent;color:#fff;font:inherit">Depois</button><button type="button" id="pwaAtualizar" style="min-height:40px;padding:0 14px;border-radius:8px;border:0;background:#fff;color:#0d4f83;font:inherit">Atualizar</button></span>';
+    document.body.appendChild(b);
+    document.getElementById('pwaDepois').onclick = () => b.remove();
+    document.getElementById('pwaAtualizar').onclick = async () => {
+      try { if (typeof salvar === 'function' && state && state.id) await salvar({semArquivo:true}); } catch (_) {}
+      recarregar = true; if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING'); else location.reload();
+    };
+  };
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (recarregar) location.reload(); });
+  window.addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('sw.js');
+      if (reg.waiting && navigator.serviceWorker.controller) avisoVersao(reg);
+      reg.addEventListener('updatefound', () => { const w = reg.installing; if (!w) return;
+        w.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) avisoVersao(reg); }); });
+      setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);   // procura versão nova a cada hora com o app aberto
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+    } catch (_) {}
+  });
 }
+if (navigator.storage && navigator.storage.persist) navigator.storage.persisted().then(p => p || navigator.storage.persist()).catch(() => {});
 /* Botão "Instalar app" (Chrome/Edge/Android); no iPhone: Compartilhar → Adicionar à Tela de Início */
 let _instalar = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); _instalar = e; const b = document.getElementById('btnInstalar'); if (b) b.hidden = false; });
