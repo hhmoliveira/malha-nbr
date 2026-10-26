@@ -3232,7 +3232,8 @@ async function lfIA(canvas, key, modelo){
 async function lfLocal(canvas){
   let r = laLerVisor(canvas); lfLocal.r = null;
   if (r.valor == null && !r.visor) r = laLerGirando(canvas);
-  if (r.valor == null && !r.visor) { const a = await laProcurar(canvas, () => {}, () => true); if (a) r = a.r; }   // visor achado e não lido: não chuta com a busca por janelas
+  if (r.valor == null && !r.visor) { const a = await laProcurar(canvas, () => {}, () => !lfParar); if (a) r = a.r; }   // visor achado e não lido: não chuta com a busca por janelas
+  if (r.valor != null && !r.visor && !/^\d+\.\d+$/.test(String(r.texto))) r = {...r, valor:null, falha:'ponto'};   // caminho antigo: só com ponto decimal (sem ele, perde dígito à noite)
   lfLocal.inferido = !!(r.valor != null && r.inferido); lfLocal.r = r;
   return r.valor != null ? r.valor : null;
 }
@@ -3245,16 +3246,43 @@ async function lerLote(){
   if (modo === 'ia') { try { localStorage.setItem(LS_KEY, key); } catch (e) {} }
   lfRodando = true; lfParar = false; const b = $('lfIr'); b.textContent = 'Parar leitura';
   let ok = 0, falha = 0, i = 0, recusada = false, nX10 = 0, nInc = 0;
-  try {
+  const conta = (p, lido, esc, inf, orig) => { lfSugerir(p, lido, esc, orig, inf); ok++; if (esc.origem === 'x10') nX10++; if (esc.origem === 'incerto') nInc++; };
+  const nPar = modo === 'ia' ? 0 : lfNucleos(), pool = nPar ? lfPool(nPar) : [];
+  if (pool.length) {
+    /* leitura local em paralelo, em processos à parte: a tela fica livre (dá para conferir a grade enquanto lê) */
+    const t0 = performance.now(), semVisor = []; let prox = 0, feitos = 0;
+    try {
+      const tarefa = async () => {
+        while (!lfParar && prox < alvo.length) {
+          const p = alvo[prox++], foto = p.foto, r = await lfLerFoto(foto, nPar); feitos++;
+          const seg = (performance.now() - t0) / 1000, resta = Math.round(seg / feitos * (alvo.length - feitos));
+          $('lfSt').textContent = `Lendo ${feitos}/${alvo.length} fotos (${pool.length} em paralelo)…${feitos > 3 && resta > 5 ? ` cerca de ${resta < 90 ? resta + ' s' : Math.round(resta / 60) + ' min'} restantes` : ''}`;
+          if (p.foto !== foto || p.lux != null || p.sug != null) continue;
+          if (r.valor != null && r.valor >= 0 && r.valor <= 200000) conta(p, r.valor, laEscalaDe(r), r.inferido, 'local');
+          else if (!r.visor && !r.erro) semVisor.push(p);
+          else { falha++; p.lfTent = true; }
+          if (feitos % 10 === 0) { salvar({semArquivo:true}).catch(() => {}); renderTabela(); }
+        }
+      };
+      await Promise.all(pool.map(() => tarefa()));
+      /* repescagem na tela, só onde o visor não foi achado: região salva e busca por janelas (caminho antigo) */
+      for (let k = 0; k < semVisor.length && !lfParar; k++) {
+        const p = semVisor[k]; $('lfSt').textContent = `Procurando o visor em ${k + 1}/${semVisor.length} foto(s) difíceis…`;
+        try { const c = await lfImagem(p), lido = await lfLocal(c), esc = laEscalaDe(lfLocal.r);
+          if (lido != null && lido >= 0 && lido <= 200000 && p.lux == null && p.sug == null) conta(p, lido, esc, lfLocal.inferido, 'local'); else { falha++; p.lfTent = true; } }
+        catch (e) { falha++; }
+      }
+    } finally { lfPoolReduzir(); lfRodando = false; b.textContent = 'Ler valores das fotos'; await salvar({semArquivo:true}); renderTudo(); }
+  } else try {
     for (const p of alvo) {
       if (lfParar) break; i++; $('lfSt').textContent = `Lendo o ponto ${nro(p)} (${i}/${alvo.length})…`;
       try {
         const c = await lfImagem(p), lido = modo === 'ia' ? await lfIA(c, key, modelo) : await lfLocal(c), esc = laEscalaDe(modo === 'ia' ? {escala:lfIA.escala} : lfLocal.r), v = lido == null ? null : laAplicar(lido, esc);   // escala do visor (X10)
-        if (v != null && v >= 0 && v <= 200000) { lfSugerir(p, lido, esc, modo === 'ia' ? 'ia' : 'local', modo !== 'ia' && lfLocal.inferido); ok++; if (esc.origem === 'x10') nX10++; if (esc.origem === 'incerto') nInc++; } else { falha++; p.lfTent = true; }
+        if (v != null && v >= 0 && v <= 200000) conta(p, lido, esc, modo !== 'ia' && lfLocal.inferido, modo === 'ia' ? 'ia' : 'local'); else { falha++; p.lfTent = true; }
       } catch (e) { falha++; if (/401|x-api-key|authentication/i.test(String(e && e.message))) { recusada = true; break; } }
       if (i % 5 === 0) { await salvar({semArquivo:true}); renderTabela(); }
     }
-  } finally { lfRodando = false; b.textContent = 'Ler valores das fotos'; await salvar({semArquivo:true}); renderTudo(); }
+  } finally { lfRodando = false; b.textContent = 'Ler valores das fotos'; await salvar({semArquivo:true}); renderTudo(); }   // IA online (ou navegador sem processos à parte): uma foto por vez
   $('lfSt').textContent = recusada ? 'A chave de API foi recusada. Confira a chave e tente de novo.'
     : `${ok} leitura(s) sugerida(s), ${falha} sem leitura${lfParar ? ' (interrompido)' : ''}${laAuto() ? ` · X10 reconhecido em ${nX10}${nInc ? `, escala a verificar em ${nInc}` : ''}` : laMult() > 1 ? ` · multiplicador ×${laMult()} aplicado` : ''}. Confira na grade abaixo ou em “Conferir fotos”.`;
   if (!recusada) lfMontarGrade();
@@ -3271,7 +3299,7 @@ function lfSugerir(p, lido, esc, orig, inf){
 }
 const LF_FUNCS = ['laOtsu','laPct','laDil','laEro','laFechar','laPreencher','laLinhaVisor','laPercentis','laNitidez','laBinarizar','laLimpar','laBorda','laBolha','laTentar','laDecodificar','laAnalisarFonte',
   'vzMascaras','vzComponentes','vzRetMin','vzAcharVisores','vzRecorte','vzMiolo','vzLinhaTopo','vzDecodificar','vzEscala','vzBorrar','vzNitidez','vzRunsIcones','vzEscalaX10','vzSemHold','vzGama','vzFormatoOk','laLerVisor'];
-const LF2 = {fila:[], rodando:false, w:null, wFalhou:false, pend:new Map(), seq:0, ia:[], iaRodando:false, iaRecusada:false, tSalvar:null};
+const LF2 = {fila:[], rodando:false, pool:[], url:null, wFalhou:false, pend:new Map(), seq:0, ia:[], iaRodando:false, iaRecusada:false, tSalvar:null};
 function lfWorkerURL(){
   const corpo = LF_FUNCS.map(n => window[n].toString()).join('\n');
   const src = `self.document = {createElement: () => new OffscreenCanvas(1, 1)};
@@ -3291,22 +3319,36 @@ self.onmessage = async e => {
 };`;
   return URL.createObjectURL(new Blob([src], {type:'text/javascript'}));
 }
-function lfWorker(){
-  if (LF2.w || LF2.wFalhou) return LF2.w;
+function lfNovoWorker(){
   try {
     if (typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined' || !new OffscreenCanvas(1, 1).getContext('2d')) throw new Error('sem OffscreenCanvas');
-    const w = new Worker(lfWorkerURL());
+    LF2.url = LF2.url || lfWorkerURL();
+    const w = new Worker(LF2.url); w.__ocup = 0;
     w.onmessage = e => { const f = LF2.pend.get(e.data.id); if (f) { LF2.pend.delete(e.data.id); f(e.data); } };
-    w.onerror = () => { LF2.wFalhou = true; for (const f of LF2.pend.values()) f({erro:'worker'}); LF2.pend.clear(); try { w.terminate(); } catch (_) {} LF2.w = null; lfFundoUI(); };
-    LF2.w = w;
-  } catch (e) { LF2.wFalhou = true; LF2.w = null; }
-  return LF2.w;
+    w.onerror = () => {   // processo caiu: tira do grupo e devolve as fotos dele para nova leitura
+      LF2.pool = LF2.pool.filter(x => x !== w); if (!LF2.pool.length) LF2.wFalhou = true;
+      for (const [id, f] of [...LF2.pend]) if (f.w === w) { LF2.pend.delete(id); f({erro:'worker'}); }
+      try { w.terminate(); } catch (_) {} lfFundoUI();
+    };
+    return w;
+  } catch (e) { return null; }
 }
-function lfLerFoto(foto){
-  const w = lfWorker();
-  if (w) return new Promise(ok => {
-    const id = ++LF2.seq, t = setTimeout(() => { LF2.pend.delete(id); ok({erro:'tempo'}); }, 90000);
-    LF2.pend.set(id, r => { clearTimeout(t); if (r.erro === 'worker') lfLerFoto(foto).then(ok); else ok(r); });   // worker caiu: refaz na tela
+/* grupo de processos de leitura: 1 em campo; no lote, até 4 conforme os núcleos do aparelho */
+function lfPool(n){
+  if (LF2.wFalhou) return [];
+  while (LF2.pool.length < n) { const w = lfNovoWorker(); if (!w) { if (!LF2.pool.length) LF2.wFalhou = true; break; } LF2.pool.push(w); }
+  return LF2.pool;
+}
+const lfWorker = () => lfPool(1)[0] || null;
+const lfNucleos = () => Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1));
+function lfPoolReduzir(){ for (const w of LF2.pool.slice(1)) if (!w.__ocup) { try { w.terminate(); } catch (_) {} LF2.pool = LF2.pool.filter(x => x !== w); } }
+function lfLerFoto(foto, n){
+  const pool = lfPool(n || 1);
+  if (pool.length) return new Promise(ok => {
+    const w = pool.reduce((a, b) => a.__ocup <= b.__ocup ? a : b), id = ++LF2.seq; w.__ocup++;
+    const fim = r => { clearTimeout(t); w.__ocup = Math.max(0, w.__ocup - 1); if (r.erro === 'worker') lfLerFoto(foto, n).then(ok); else ok(r); };   // processo caiu: refaz
+    const t = setTimeout(() => { LF2.pend.delete(id); fim({erro:'tempo'}); }, 90000);
+    fim.w = w; LF2.pend.set(id, fim);
     w.postMessage({id, foto, cal:JSON.parse(JSON.stringify(LA.cal))});
   });
   return new Promise(ok => {   // sem worker: lê na tela, mas só com a câmera fechada (não trava a captura)
