@@ -163,7 +163,7 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
 <div class="boot" id="boot">Carregando a ferramenta… Se esta mensagem não sumir, o aplicativo que abriu o arquivo não executa scripts. Abra o arquivo no Chrome (Android) ou no Safari (iPhone).</div>
 
 <div class="progress" aria-live="polite">
-  <span class="count" id="pgCount">0 / 0</span><span class="note" id="lfFundoChip" hidden style="margin:0 0 0 8px;font-weight:700;color:var(--brand)"></span>
+  <span class="count" id="pgCount">0 / 0</span><span class="note" id="eqChip" hidden style="margin:0 0 0 8px;font-weight:700;color:var(--via)"></span><span class="note" id="lfFundoChip" hidden style="margin:0 0 0 8px;font-weight:700;color:var(--brand)"></span>
   <div class="bar" aria-hidden="true"><i id="pgBar"></i></div>
   <span class="saved" id="pgSaved"></span>
   <button class="btn primary small" id="btnProx">Medir próximo pendente</button>
@@ -193,6 +193,36 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
     </select>
   </div>
   <div class="levs" id="levs"></div>
+</section>
+
+<section class="card" id="secEq">
+  <details id="eqBox"><summary>Equipes · medir em mais de um aparelho<span id="eqSum"></span></summary>
+    <p class="note">Para dividir a medição entre pessoas: um aparelho envia o <b>convite</b>; cada um abre o arquivo, escolhe a equipe e a sua parte; no fim, cada um envia a <b>sua parte</b> e um aparelho <b>mescla</b>. Funciona sem internet em campo (os arquivos vão por WhatsApp, Drive, cabo…).</p>
+    <div class="grid">
+      <div class="fld"><label for="eqNome">Equipe deste aparelho</label><input id="eqNome" placeholder="ex.: A" maxlength="20"></div>
+      <div class="fld"><label for="eqOp">Operador</label><input id="eqOp" placeholder="Nome de quem mede"></div>
+      <div class="fld full"><label for="eqInstr">Luxímetro deste aparelho (modelo · nº de série · certificado)</label><input id="eqInstr" placeholder="ex.: Minipa MLM-1011 · 12345 · cert. 2026/0456"></div>
+    </div>
+    <div class="fld-lbl" style="margin-top:10px">Parte desta equipe</div>
+    <div class="eq-gs" id="eqGrupos"></div>
+    <p class="note" id="eqSt" style="margin:4px 0"></p>
+    <p class="note" id="eqLista" style="margin:4px 0"></p>
+    <div class="actions">
+      <button class="btn primary" type="button" id="eqConviteBtn">Enviar convite para a equipe</button>
+      <button class="btn ghost" type="button" id="eqParteBtn">Enviar minha parte (com fotos)</button>
+      <label class="btn accent" for="eqMesclarIn">Mesclar parte de outra equipe</label><input id="eqMesclarIn" type="file" accept="application/json,.json" hidden>
+    </div>
+    <div id="eqConf" hidden></div>
+    <h4 style="margin:16px 0 4px">Aferição cruzada dos luxímetros</h4>
+    <p class="note" style="margin:0">Antes de começar, todas as equipes medem o <b>mesmo ponto</b> com o próprio luxímetro e registram aqui. Diferença grande entre aparelhos distorce a uniformidade (U0).</p>
+    <div class="grid" style="margin-top:6px">
+      <div class="fld"><label for="eqAferRef">Ponto de referência</label><input id="eqAferRef" placeholder="ex.: sob o poste 1, centro do passeio"></div>
+      <div class="fld"><label for="eqAferVal">Leitura deste luxímetro (lx)</label><input id="eqAferVal" inputmode="decimal" placeholder="ex.: 23,5"></div>
+      <div class="fld"><label for="eqAferLim">Limite de desvio (%)</label><input id="eqAferLim" inputmode="decimal" value="5"></div>
+    </div>
+    <div class="actions"><button class="btn ghost" type="button" id="eqAferBtn">Registrar leitura deste luxímetro</button></div>
+    <div id="eqAferTab"></div>
+  </details>
 </section>
 
 <section class="card" id="secCfg">
@@ -713,7 +743,7 @@ function svgMalha(){
     const cx = X(p.long).toFixed(1);
     const cy = (p.kind === 'via' ? yR0 + ((p.g-1)*L + p.trans)*sy : (p.g === 1 ? yR0 - p.trans*sy : yR1 + p.trans*sy)).toFixed(1);
     const med = p.lux != null, k = nro(p), est = !med && em.has(p.id) ? fmtEst(p, em.get(p.id)) : null;
-    s += `<g class="pt ${p.kind}${med?' ok':''}${i===sel?' sel':''}" data-i="${i}" tabindex="0" role="button" aria-label="Ponto ${k}, ${esc(grupoNome(p))}, ${med?fmtVal(p)+' '+unid(p):est?est+' '+unid(p):'pendente'}">
+    s += `<g class="pt ${p.kind}${med?' ok':''}${i===sel?' sel':''}${eqFora(p)?' fora':''}${p.conf?' conf':''}" data-i="${i}" tabindex="0" role="button" aria-label="Ponto ${k}, ${esc(grupoNome(p))}, ${med?fmtVal(p)+' '+unid(p):est?est+' '+unid(p):'pendente'}">
       <title>Ponto ${k} · ${esc(grupoNome(p))}${med?' · '+fmtVal(p)+' '+unid(p):est?' · '+est+' '+unid(p):''}</title>
       <circle class="hit" cx="${cx}" cy="${cy}" r="18"/><circle class="dot" cx="${cx}" cy="${cy}" r="11.5"/>
       <text class="num${k>=100?' n3':''}" x="${cx}" y="${cy}">${k}</text>
@@ -993,8 +1023,8 @@ function normLev(l){
   return l;
 }
 function levLeve(){
-  return { id:state.id, cfg:state.cfg, criado:state.criado, atualizado:state.atualizado, salvoArquivo:state.salvoArquivo||null, estOn:!!state.estOn, exemplo:!!state.exemplo,
-           pontos:state.pontos.map(p => ({...p, foto:null, temFoto:!!p.foto})) };
+  return { id:state.id, cfg:state.cfg, criado:state.criado, atualizado:state.atualizado, salvoArquivo:state.salvoArquivo||null, estOn:!!state.estOn, exemplo:!!state.exemplo, equipes:state.equipes || {}, afer:state.afer || [], aferLim:state.aferLim || 5,
+           pontos:state.pontos.map(p => ({...p, foto:null, temFoto:!!p.foto, conf:p.conf ? {...p.conf} : undefined})) };
 }
 async function salvar(opts = {}){
   if (!state.id) return;
@@ -1064,7 +1094,7 @@ async function renderLevs(){
 /* ---------- Arquivo no aparelho ---------- */
 function jsonTexto(){
   return JSON.stringify({formato:'malhaNBR5101', versao:3, exportadoEm:new Date().toISOString(),
-    id:state.id, criado:state.criado, cfg:state.cfg, estOn:!!state.estOn, exemplo:!!state.exemplo, pontos:state.pontos}, null, 1);
+    id:state.id, criado:state.criado, cfg:state.cfg, estOn:!!state.estOn, exemplo:!!state.exemplo, equipes:state.equipes || {}, afer:state.afer || [], aferLim:state.aferLim || 5, pontos:state.pontos}, null, 1);
 }
 const baseNome = () => `malha_${slug(state.cfg.municipio)}_${slug(state.cfg.via)}_${state.cfg.classeC}${ladosDe(state.cfg.calc).length?'_'+state.cfg.classeP:''}${casoOn()?'_estudo_de_caso':''}`;
 let _cap = null;   // quando ativo, os exports são recolhidos para o pacote .zip em vez de baixados
@@ -1152,18 +1182,27 @@ async function importarJSON(file){
       const levs = await listarLevs() || [];
       let id = o.id || novoId();
       if (levs.some(l => l.id === id)) {
-        const r = await pedir('Este levantamento já existe no aparelho.', [{t:'Substituir pela versão do arquivo', v:'sub', cls:'primary'}, {t:'Importar como cópia', v:'copia'}, {t:'Cancelar', v:null}]);
+        const r = await pedir(o.tipo === 'convite' ? 'Este levantamento já está no aparelho (convite repetido).' : 'Este levantamento já existe no aparelho. Se o arquivo é a parte de outra equipe, use “Mesclar”.',
+          [{t:'Mesclar (juntar medições das equipes)', v:'mesclar', cls:'primary'}, {t:'Substituir pela versão do arquivo', v:'sub'}, {t:'Importar como cópia', v:'copia'}, {t:'Cancelar', v:null}]);
         if (!r) return;
+        if (r === 'mesclar') {
+          if (state.id !== id) await abrirLev(id, true);
+          const m = await eqMesclar(o);
+          if (m.erro === 'malha') toast('Não dá para mesclar: a malha do arquivo é diferente. Gere as duas a partir do mesmo convite.', 7000);
+          else { toast(`Mesclado: ${m.novos} ponto(s) trazido(s)${m.conflitos ? `, ${m.conflitos} conflito(s) para decidir em “Equipes”` : ''}.`, 7000); if (m.conflitos) $('eqBox').open = true; try { lfFundoRetomar(); } catch (_) {} }
+          return;
+        }
         if (r === 'copia') id = novoId();
       }
-      const l = normLev({ id, criado:o.criado || new Date().toISOString(), cfg:o.cfg, estOn:!!o.estOn, exemplo:!!o.exemplo, pontos:o.pontos.map(p => ({...p})) });
+      const l = normLev({ id, criado:o.criado || new Date().toISOString(), cfg:o.cfg, estOn:!!o.estOn, exemplo:!!o.exemplo, equipes:o.equipes || {}, afer:o.afer || [], aferLim:o.aferLim || 5, pontos:o.pontos.map(p => ({...p})) });
       state = { ...l, salvoArquivo:{em:new Date().toISOString(), med:l.pontos.filter(p=>p.lux!=null).length, nome:file.name, tipo:'arquivo'} };
       fileHandle = null; arqPendente = false;
       await fotosApagarLev(id);
       for (const p of state.pontos) if (p.foto) await fotoPut(p.id, p.foto);
       await salvar({semArquivo:true});
       escreverCfg(state.cfg); renderTudo(); renderLevs();
-      toast(`Aberto do arquivo: ${nMed()} medição(ões).`);
+      toast(o.tipo === 'convite' ? 'Convite aberto. Em “Equipes”, informe a equipe e marque a parte deste aparelho.' : `Aberto do arquivo: ${nMed()} medição(ões).`, o.tipo === 'convite' ? 7000 : undefined);
+      if (o.tipo === 'convite') { $('eqBox').open = true; setTimeout(() => $('secEq').scrollIntoView({behavior:'smooth'}), 300); }
     } catch(e) { toast('Arquivo inválido. Use um .json salvo por esta ferramenta.'); }
   };
   r.readAsText(file);
@@ -1557,8 +1596,8 @@ function proximoPendente(from){
     : alt ? ((p, i) => p.lux == null && !p.foto && (nro(p) % 2 === 1 || i === n - 1))   // alternado: pontos ímpares + o último
     : ((p, i) => p.lux == null && !p.foto);
   const ord = ordemPontos(), pos0 = (from == null || from < 0) ? -1 : ord.indexOf(from);
-  for (let k=1; k<=n; k++) { const i = ord[(pos0 + k + n) % n]; if (ok(state.pontos[i], i)) return i; }
-  if (!modoConf && !alt) for (let k=1; k<=n; k++) { const i = ord[(pos0 + k + n) % n]; if (state.pontos[i].lux == null) return i; }
+  for (let k=1; k<=n; k++) { const i = ord[(pos0 + k + n) % n]; if (!eqFora(state.pontos[i]) && ok(state.pontos[i], i)) return i; }   // só a parte desta equipe
+  if (!modoConf && !alt) for (let k=1; k<=n; k++) { const i = ord[(pos0 + k + n) % n]; if (!eqFora(state.pontos[i]) && state.pontos[i].lux == null) return i; }
   return null;
 }
 /* valor do campo: aceita "12,4", "12,4 lx" ou "12,4lx"; a unidade é a do ponto (lx, ou cd/m² na via classe M) */
@@ -1568,7 +1607,7 @@ async function salvarPonto(irProx){
   const raw = $('lux').value.trim(), v = luxDoCampo(raw);
   const p0 = state.pontos[sel], temFoto = fotoTemp !== undefined ? !!fotoTemp : !!p0.foto;
   if (raw === '' && temFoto && p0.lux == null) {          // só a foto: o valor é conferido depois no escritório
-    const idx = sel; p0.hora = new Date().toISOString();
+    const idx = sel; p0.hora = new Date().toISOString(); eqCarimbar(p0);
     if (fotoTemp !== undefined) { p0.foto = fotoTemp; fotoPut(p0.id, fotoTemp); delete p0.sug; delete p0.sugOrig; delete p0.sugInf; delete p0.sugEsc; delete p0.sugLido; delete p0.lfTent; delete p0.iaPend; }
     lfFundoPor(p0);   // lê o visor em segundo plano (valor sugerido, sem parar a câmera)
     const prox = irProx ? proximoPendente(idx) : null;
@@ -1581,7 +1620,7 @@ async function salvarPonto(irProx){
     $('luxErr').textContent = `Digite a leitura do instrumento (ex.: 12,4 ${unid(state.pontos[sel])}) ou tire a foto do visor e salve só a foto.`; $('luxErr').hidden = false; $('lux').focus(); return;
   }
   const p = state.pontos[sel], idx = sel;
-  p.lux = Math.round(v*1000)/1000; p.hora = new Date().toISOString(); delete p.auto; delete p.imp;
+  p.lux = Math.round(v*1000)/1000; p.hora = new Date().toISOString(); delete p.auto; delete p.imp; eqCarimbar(p);
   if (p.sug != null) { if (Math.abs(p.sug - p.lux) < 1e-9) p.lidoPor = p.sugOrig; else delete p.lidoPor; delete p.sug; delete p.sugOrig; delete p.sugInf; delete p.sugEsc; delete p.sugLido; delete p.lfTent; delete p.iaPend; } else delete p.lidoPor;
   if (LA.conf && LA.conf.id === p.id && Math.abs(LA.conf.v - v) < 1e-9) p.ocr = true; else delete p.ocr;
   if (fotoTemp !== undefined) { p.foto = fotoTemp; fotoPut(p.id, fotoTemp); }
@@ -1714,11 +1753,33 @@ async function capturar(){
 function exportarCSV(){
   const em = estimarPendentes(), c = cfgExp(), q = x => '"' + String(x ?? '').replace(/"/g,'""') + '"';
   const n = (x,d) => x == null ? '' : Number(x).toFixed(d).replace('.', ',');
-  const rows = [['Município','Via','Data','Responsável','Instrumento','Nº','Área','Classe','Grupo','Longitudinal_m','Transversal_m','Valor','Unidade','Foto','Situação','Hora','Observações'].concat(state.estOn ? ['Valor_estimado'] : [], casoOn() || impN() || ocrN() ? ['Origem'] : [])];
-  state.pontos.forEach(p => rows.push([c.municipio, c.via, c.data, c.resp, c.luximetro, nro(p), p.kind==='via'?'Via':'Passeio',
+  const rows = [['Município','Via','Data','Responsável','Instrumento'].concat(eqUsa() ? ['Equipe'] : []).concat(['Nº','Área','Classe','Grupo','Longitudinal_m','Transversal_m','Valor','Unidade','Foto','Situação','Hora','Observações']).concat(state.estOn ? ['Valor_estimado'] : [], casoOn() || impN() || ocrN() ? ['Origem'] : [])];
+  state.pontos.forEach(p => rows.push([c.municipio, c.via, c.data, p.op || c.resp, p.instr || c.luximetro].concat(eqUsa() ? [p.eq || ''] : []).concat([nro(p), p.kind==='via'?'Via':'Passeio',
     p.kind==='via'?c.classeC:c.classeP, grupoNome(p), n(p.long,2), n(p.trans,2), n(p.lux,3), unid(p), p.foto?'Sim':'Não', p.lux != null ? 'Medido' : p.foto ? 'Só foto - conferir valor' : 'Pendente',
-    p.hora ? new Date(p.hora).toLocaleString('pt-BR') : '', c.obs || ''].concat(state.estOn ? [p.lux == null && em.has(p.id) ? n(em.get(p.id), 3) : ''] : [], casoOn() || impN() || ocrN() ? [p.auto ? 'ilustrativo' : p.imp ? 'folha de campo' : p.lidoPor === 'ia' ? 'foto lida por IA (conferida)' : p.lidoPor === 'local' ? 'foto lida por OCR local (conferida)' : p.ocr ? 'visor lido pela câmera (conferido)' : p.lux != null ? 'medido' : ''] : [])));
+    p.hora ? new Date(p.hora).toLocaleString('pt-BR') : '', c.obs || ''].concat(state.estOn ? [p.lux == null && em.has(p.id) ? n(em.get(p.id), 3) : ''] : [], casoOn() || impN() || ocrN() ? [p.auto ? 'ilustrativo' : p.imp ? 'folha de campo' : p.lidoPor === 'ia' ? 'foto lida por IA (conferida)' : p.lidoPor === 'local' ? 'foto lida por OCR local (conferida)' : p.ocr ? 'visor lido pela câmera (conferido)' : p.lux != null ? 'medido' : ''] : []))));
   baixar(new Blob(['﻿' + rows.map(r => r.map(q).join(';')).join('\r\n')], {type:'text/csv;charset=utf-8'}), baseNome()+'.csv');
+}
+/* instrumentos e equipes usados no levantamento (para relatório, CSV e PDF) */
+function eqInstrumentos(){
+  const v = [], add = x => { x = String(x || '').trim(); if (x && !v.includes(x)) v.push(x); };
+  for (const p of state.pontos) if (p.lux != null || p.foto) add(p.instr);
+  for (const e of Object.values(state.equipes || {})) add(e.instr);
+  if (!v.length) add(state.cfg.luximetro);
+  return v;
+}
+const eqUsa = () => state.pontos.some(p => p.eq) || Object.keys(state.equipes || {}).length > 0;
+function eqRelHTML(){
+  if (!eqUsa() && !(state.afer || []).length) return '';
+  const eqs = {};
+  for (const [n, e] of Object.entries(state.equipes || {})) eqs[n] = {op:e.op, instr:e.instr, med:0, foto:0};
+  for (const p of state.pontos) if (p.eq) { const e = eqs[p.eq] = eqs[p.eq] || {op:p.op, instr:p.instr, med:0, foto:0}; if (p.lux != null) e.med++; else if (p.foto) e.foto++; }
+  const st = eqAferStats(), nc = state.pontos.filter(p => p.conf).length;
+  return `<h2>Equipes e instrumentos</h2><table><tr><th>Equipe</th><th>Operador</th><th>Luxímetro</th><th style="text-align:right">Pontos medidos</th></tr>
+${Object.entries(eqs).map(([n, e]) => `<tr><td><b>${esc(n)}</b></td><td>${esc(e.op || '')}</td><td>${esc(e.instr || '')}</td><td class="n">${e.med}${e.foto ? ` (+${e.foto} só foto)` : ''}</td></tr>`).join('')}</table>
+${nc ? `<p class="note" style="color:var(--bad)"><b>${nc} ponto(s) com conflito entre equipes não resolvido</b>: vale a medição do aparelho que gerou o relatório.</p>` : ''}
+${st ? `<h2>Aferição cruzada dos luxímetros</h2><table><tr><th>Equipe</th><th>Operador</th><th>Luxímetro</th><th>Ponto de referência</th><th style="text-align:right">Leitura</th><th style="text-align:right">Desvio da média</th><th>Hora</th></tr>
+${st.rows.map(r => `<tr><td>${esc(r.eq || '')}</td><td>${esc(r.op || '')}</td><td>${esc(r.instr || '')}</td><td>${esc(r.ref || '')}</td><td class="n">${laNum(r.valor)} lx</td><td class="n">${r.desv >= 0 ? '+' : ''}${laNum(Math.round(r.desv * 10) / 10)} %</td><td>${hhmm(r.hora)}</td></tr>`).join('')}</table>
+<p class="note">Média ${laNum(Math.round(st.media * 10) / 10)} lx · diferença entre luxímetros ${laNum(Math.round(st.dif * 10) / 10)} % · limite adotado ${laNum(st.lim)} % — ${st.instrs < 2 ? 'aferição com um só instrumento.' : st.alerta ? '<b style="color:var(--bad)">desvio acima do limite: a comparação entre pontos medidos por instrumentos diferentes deve ser avaliada com cautela.</b>' : 'instrumentos dentro do limite.'}</p>` : ''}`;
 }
 function exportarRelatorio(){
   const c = cfgExp(), {W, H, s} = svgMalha();
@@ -1744,16 +1805,17 @@ ${casoOn() ? `<div class="metodo" style="border-color:var(--bad)"><b>ESTUDO DE C
 <h2>Identificação</h2><table class="meta">
 <tr><td>Município</td><td>${esc(c.municipio)}</td></tr><tr><td>Via do trecho</td><td>${esc(c.via)}</td></tr>
 <tr><td>Data</td><td>${esc(c.data ? c.data.split('-').reverse().join('/') : '')}</td></tr><tr><td>Responsável</td><td>${esc(c.resp)}</td></tr>
-<tr><td>Instrumento</td><td>${esc(c.luximetro)}</td></tr>
+<tr><td>Instrumento</td><td>${eqInstrumentos().map(esc).join('<br>')}</td></tr>
 <tr><td>Geometria</td><td>S = ${fmt(c.S)} m · ${c.faixas} faixa(s) de ${fmt(c.L)} m · passeios: ${ls.length? ls.map(l=>`lado ${l} (${fmt(c['Lc'+l])} m)`).join(', ') : 'nenhum'}</td></tr>
 <tr><td>Classes</td><td>Via ${c.classeC}${isM() ? ' (luminância, cd/m²)' : ' (iluminância, lx)'}${ls.length?` · Passeio ${c.classeP}`:''}</td></tr>
 <tr><td>Pontos medidos</td><td>${med} de ${state.pontos.length}</td></tr></table>
+${eqRelHTML()}
 <h2>Resumo de conformidade</h2><div class="cards">${$('resumo').innerHTML}</div>
 <p class="note">${esc($('resumoNote').textContent)}</p>
 <h2>Malha</h2><div class="svg"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${s}</svg></div>
 ${c.obs ? `<h2>Observações</h2><p style="white-space:pre-wrap">${esc(c.obs)}</p>` : ''}
-<h2>Registros</h2><table><tr><th>Nº</th><th>Área</th><th>Grupo</th><th>Long. (m)</th><th>Transv. (m)</th><th>Valor</th><th>Foto</th><th>Hora</th></tr>
-${state.pontos.map(p=>`<tr><td><b>${nro(p)}</b></td><td>${esc(areaNome(p))}</td><td>${grupoNome(p)}</td><td class="n">${fmt(p.long)}</td><td class="n">${fmt(p.trans)}</td>${valCel(p, em)}<td>${p.foto?'Sim':'—'}</td><td>${p.hora?hhmm(p.hora):'—'}</td></tr>`).join('')}</table>
+<h2>Registros</h2><table><tr><th>Nº</th><th>Área</th><th>Grupo</th><th>Long. (m)</th><th>Transv. (m)</th><th>Valor</th><th>Foto</th><th>Hora</th>${eqUsa() ? '<th>Equipe</th>' : ''}</tr>
+${state.pontos.map(p=>`<tr><td><b>${nro(p)}</b></td><td>${esc(areaNome(p))}</td><td>${grupoNome(p)}</td><td class="n">${fmt(p.long)}</td><td class="n">${fmt(p.trans)}</td>${valCel(p, em)}<td>${p.foto?'Sim':'—'}</td><td>${p.hora?hhmm(p.hora):'—'}</td>${eqUsa() ? `<td>${esc(p.eq || '—')}${p.conf ? ' ⚠' : ''}</td>` : ''}</tr>`).join('')}</table>
 ${fotos.length?`<h2>Registro fotográfico (${fotos.length})</h2><div class="fotos">${fotos.map(p=>`<figure><img src="${p.foto}" alt="Ponto ${nro(p)}"><figcaption><b>Ponto ${nro(p)}</b> · ${esc(grupoNome(p))} · ${p.lux==null?'valor a conferir':fmtVal(p)+' '+unid(p)}</figcaption></figure>`).join('')}</div>`:''}
 </body></html>`;
   baixar(new Blob([html], {type:'text/html;charset=utf-8'}), 'relatorio_' + baseNome() + '.html');
@@ -1976,7 +2038,7 @@ async function montarPDF(){
   /* 1. Identificação */
   secao(1, 'Identificação');
   kv([['Via do trecho', c.via], ['Município / local', c.municipio],
-      ['Data', c.data ? c.data.split('-').reverse().join('/') : ''], ['Responsável', c.resp], ['Instrumento (modelo / nº série)', c.luximetro],
+      ['Data', c.data ? c.data.split('-').reverse().join('/') : ''], ['Responsável', c.resp], ['Instrumento (modelo / nº série)', eqInstrumentos().join('; ')],
       ['Classe da via', `${c.classeC}${isM() ? ' (luminância, cd/m²)' : ' (iluminância, lx)'}`], ['Classe do passeio', ls.length ? c.classeP : 'Sem passeio'],
       ['Pontos medidos', `${nMed()} de ${state.pontos.length}`]]);
   if (casoOn()) { ensure(14); doc.texto('ESTUDO DE CASO — documento de exemplo com valores ilustrativos; não constitui levantamento de campo nem laudo.', M, y + 9, {size:8.5, bold:true, color:K.warn}); y += 16; }
@@ -3444,6 +3506,216 @@ function lfFundoRetomar(){
 })();
 { const _abrirLev = abrirLev; abrirLev = async (...a) => { const r = await _abrirLev(...a); try { lfFundoRetomar(); } catch (_) {} return r; }; }
 setTimeout(() => { try { lfFundoRetomar(); } catch (_) {} }, 2500);
+
+/* ---------- Equipes: medir o mesmo levantamento em mais de um aparelho ----------
+   1) Um aparelho envia o CONVITE (a malha, sem fotos nem valores); os outros abrem o arquivo. A numeração dos pontos
+      é a mesma em todos (P001, P002…), então as partes casam depois.
+   2) Cada aparelho escolhe a sua EQUIPE e a sua PARTE (grupos de pontos). "Medir próximo pendente" e "Capturar e ir ao
+      próximo ponto" percorrem só a parte da equipe; os outros pontos ficam apagados na malha.
+   3) Cada ponto salvo registra a equipe, o operador e o luxímetro usados.
+   4) No fim, cada um envia a SUA PARTE (com fotos) e um aparelho MESCLA: pontos vazios recebem o que veio; ponto medido
+      nos dois aparelhos com dados diferentes vira CONFLITO, resolvido aqui com as duas fotos lado a lado.
+   5) AFERIÇÃO CRUZADA: todos medem o mesmo ponto de referência; desvio acima do limite gera alerta e vai ao relatório.
+   A equipe e a parte deste aparelho ficam guardadas só neste aparelho; equipes, aferições e conflitos viajam no arquivo. */
+const EQ_CAMPOS = ['lux','foto','hora','auto','imp','ocr','sug','sugOrig','sugInf','sugEsc','sugLido','lfTent','iaPend','lidoPor','esc','eq','op','instr'];
+const eqGk = p => p.kind + ':' + p.g;
+const eqGNome = k => { const [kind, g] = k.split(':'); return kind === 'via' ? `Faixa ${g}` : `Passeio ${g}`; };
+function eqGrupos(){ const v = []; for (const p of state.pontos || []) { const k = eqGk(p); if (!v.includes(k)) v.push(k); } return v; }
+function eqPadrao(){ try { return JSON.parse(localStorage.getItem('malhaNBR5101.eqPadrao') || 'null') || {}; } catch (e) { return {}; } }
+function eqLocal(){
+  let o = null; try { o = JSON.parse(localStorage.getItem('malhaNBR5101.eq.' + state.id) || 'null'); } catch (e) {}
+  const d = eqPadrao(); return {nome:(o && o.nome) || d.nome || '', op:(o && o.op) || d.op || '', instr:(o && o.instr) || d.instr || '', grupos:(o && o.grupos) || []};
+}
+function eqGuardar(o){
+  try { localStorage.setItem('malhaNBR5101.eq.' + state.id, JSON.stringify(o)); localStorage.setItem('malhaNBR5101.eqPadrao', JSON.stringify({nome:o.nome, op:o.op, instr:o.instr})); } catch (e) {}
+  if (o.nome) {   // a equipe fica registrada no levantamento (vai no arquivo e no relatório)
+    state.equipes = state.equipes || {};
+    state.equipes[o.nome] = {op:o.op, instr:o.instr, grupos:o.grupos, atualizado:new Date().toISOString()};
+  }
+}
+/* ponto fora da parte desta equipe (só quando há divisão: alguns grupos marcados, não todos) */
+function eqFora(p){
+  if (!state || !state.id) return false;
+  const e = eqLocal(); if (!e.grupos.length) return false;
+  const gs = eqGrupos(); if (e.grupos.length >= gs.length) return false;
+  return !e.grupos.includes(eqGk(p));
+}
+function eqCarimbar(p){ const e = eqLocal(); if (e.nome) p.eq = e.nome; if (e.op) p.op = e.op; if (e.instr) p.instr = e.instr; }
+/* ---------- arquivos: convite, minha parte, mesclar ---------- */
+async function eqCompartilhar(texto, nome, titulo){
+  const blob = new Blob([texto], {type:'application/json'});
+  try {
+    const f = new File([blob], nome, {type:'application/json'});
+    if (navigator.canShare && navigator.canShare({files:[f]})) { await navigator.share({files:[f], title:titulo, text:titulo}); return 'share'; }
+  } catch (e) { if (e && e.name === 'AbortError') return 'cancel'; }
+  baixar(blob, nome); return 'download';
+}
+async function eqConvite(){
+  if (!state.cfg) { toast('Nenhum levantamento aberto.'); return; }
+  eqGuardar(eqLerForm());
+  const o = {formato:'malhaNBR5101', versao:3, tipo:'convite', exportadoEm:new Date().toISOString(), id:state.id, criado:state.criado, cfg:state.cfg,
+    estOn:!!state.estOn, equipes:state.equipes || {}, afer:state.afer || [],
+    pontos:state.pontos.map(p => ({id:p.id, kind:p.kind, g:p.g, long:p.long, trans:p.trans, lux:null, foto:null, hora:null}))};
+  const r = await eqCompartilhar(JSON.stringify(o), 'convite_' + baseNome() + '.json', 'Levantamento ' + (state.cfg.via || '') + ' — convite para a equipe');
+  if (r !== 'cancel') toast(r === 'share' ? 'Convite enviado. No outro aparelho: “Abrir arquivo salvo” e escolher a equipe.' : 'Convite salvo em Downloads. Envie o arquivo ao outro aparelho e abra com “Abrir arquivo salvo”.', 6000);
+}
+async function eqEnviarParte(){
+  if (!state.cfg) { toast('Nenhum levantamento aberto.'); return; }
+  const e = eqLerForm(); eqGuardar(e); await salvar({semArquivo:true});
+  const r = await eqCompartilhar(jsonTexto(), 'parte_' + slug(e.nome || 'equipe') + '_' + baseNome() + '.json', 'Levantamento ' + (state.cfg.via || '') + ' — parte da equipe ' + (e.nome || ''));
+  if (r !== 'cancel') toast(r === 'share' ? 'Parte enviada (com fotos). No aparelho que vai juntar: “Mesclar parte de outra equipe”.' : 'Parte salva em Downloads (com fotos). No aparelho que vai juntar: “Mesclar parte de outra equipe”.', 6000);
+}
+const eqTem = p => p.lux != null || !!p.foto || p.sug != null;
+const eqCopia = q => { const o = {}; for (const k of EQ_CAMPOS) if (q[k] !== undefined && q[k] !== null) o[k] = q[k]; return o; };
+function eqIgual(p, q){
+  if ((p.lux ?? null) !== (q.lux ?? null)) return false;
+  if (!!p.foto !== !!q.foto) return false;
+  if (p.foto && q.foto && p.foto !== q.foto) return false;
+  return (p.lux != null) || (p.hora || '') === (q.hora || '') || p.foto === q.foto;
+}
+/* junta o arquivo de outra equipe no levantamento aberto (mesma malha) */
+async function eqMesclar(o){
+  if (!o || !Array.isArray(o.pontos)) throw new Error('arquivo inválido');
+  const mapa = new Map(state.pontos.map(p => [p.id, p]));
+  const casa = (p, q) => p && p.kind === q.kind && p.g === q.g && Math.abs(p.long - q.long) < .01 && Math.abs(p.trans - q.trans) < .01;
+  if (o.pontos.length !== state.pontos.length || o.pontos.some(q => !casa(mapa.get(q.id), q))) return {erro:'malha'};
+  let novos = 0, conflitos = 0, iguais = 0;
+  for (const q of o.pontos) {
+    const p = mapa.get(q.id);
+    if (!eqTem(q)) continue;
+    if (!eqTem(p)) { Object.assign(p, eqCopia(q)); if (q.foto) await fotoPut(p.id, q.foto); delete p.conf; novos++; continue; }
+    if (eqIgual(p, q)) {
+      if (p.lux == null && p.sug == null && q.sug != null) Object.assign(p, eqCopia(q));   // o outro aparelho já tinha a leitura sugerida
+      iguais++; continue;
+    }
+    if (p.conf && eqIgual(p.conf, q)) { conflitos++; continue; }
+    p.conf = eqCopia(q); conflitos++;
+  }
+  state.equipes = state.equipes || {};
+  for (const [n, e] of Object.entries(o.equipes || {})) { const a = state.equipes[n]; if (!a || (e.atualizado || '') > (a.atualizado || '')) state.equipes[n] = e; }
+  const chave = a => [a.eq, a.instr, a.hora, a.valor].join('|'), ja = new Set((state.afer || []).map(chave));
+  state.afer = (state.afer || []).concat((o.afer || []).filter(a => !ja.has(chave(a))));
+  await salvar({medicao:true}); renderTudo(); renderLevs();
+  return {novos, conflitos, iguais};
+}
+function eqLerArquivo(file){
+  return new Promise((ok, er) => { const r = new FileReader(); r.onload = () => { try { ok(JSON.parse(r.result)); } catch (e) { er(e); } }; r.onerror = er; r.readAsText(file); });
+}
+async function eqMesclarArquivo(file){
+  if (!file) return;
+  if (!state.cfg) { toast('Abra primeiro o levantamento que vai receber as partes.'); return; }
+  let o; try { o = await eqLerArquivo(file); } catch (e) { toast('Arquivo inválido. Use um .json salvo por esta ferramenta.'); return; }
+  if (!o || !o.cfg || !Array.isArray(o.pontos)) { toast('Arquivo inválido. Use um .json salvo por esta ferramenta.'); return; }
+  if (o.id && o.id !== state.id) {
+    const levs = await listarLevs() || [];
+    if (levs.some(l => l.id === o.id)) { await abrirLev(o.id, true); }
+    else if (!(await confirmar('Este arquivo é de outro levantamento (outro convite). Mesclar mesmo assim no levantamento aberto? Só funciona se a malha for idêntica.', 'Mesclar no aberto'))) return;
+  }
+  const r = await eqMesclar(o);
+  if (r.erro === 'malha') { toast('Não dá para mesclar: a malha do arquivo é diferente (geometria ou nº de pontos). Gere as duas a partir do mesmo convite.', 7000); return; }
+  toast(`Mesclado: ${r.novos} ponto(s) trazido(s) da outra equipe${r.conflitos ? `, ${r.conflitos} conflito(s) para decidir em “Equipes”` : ''}.`, 7000);
+  if (r.conflitos) { $('eqBox').open = true; $('eqConf').scrollIntoView({behavior:'smooth', block:'start'}); }
+  try { lfFundoRetomar(); } catch (_) {}
+}
+/* ---------- conflitos ---------- */
+function eqResumo(p){
+  const v = p.lux != null ? `${fmtVal(p)} ${unid(p)}` : p.sug != null ? `${laNum(p.sug)} ${unid(p)} (sugerido)` : p.foto ? 'só foto' : '—';
+  return `<div class="eqv"><b>${esc(v)}</b></div><div class="note" style="margin:0">${esc(p.eq ? 'Equipe ' + p.eq : 'sem equipe')}${p.op ? ' · ' + esc(p.op) : ''}${p.hora ? ' · ' + hhmm(p.hora) : ''}${p.instr ? '<br>' + esc(p.instr) : ''}</div>`;
+}
+function eqRenderConf(){
+  const box = $('eqConf'), lst = (state.pontos || []).filter(p => p.conf);
+  if (!lst.length) { box.innerHTML = ''; box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = `<h4 style="margin:12px 0 6px;color:var(--bad)">${lst.length} ponto(s) medido(s) nos dois aparelhos com dados diferentes</h4>
+    <p class="note" style="margin:0 0 8px">Compare as fotos e escolha a medição que vale. Enquanto não decidir, vale a deste aparelho (à esquerda).</p>
+    <div class="eqc">${lst.map(p => `<div class="eqc-card" data-id="${p.id}"><b>Ponto ${nro(p)} · ${esc(grupoNome(p))}</b>
+      <div class="eqc-par">
+        <div class="eqc-lado">${p.foto ? `<img src="${p.foto}" alt="Foto deste aparelho">` : '<div class="eqc-sem">sem foto</div>'}${eqResumo(p)}<button type="button" class="btn ghost small" data-usar="a">Usar esta</button></div>
+        <div class="eqc-lado">${p.conf.foto ? `<img src="${p.conf.foto}" alt="Foto do outro aparelho">` : '<div class="eqc-sem">sem foto</div>'}${eqResumo(p.conf)}<button type="button" class="btn primary small" data-usar="b">Usar esta</button></div>
+      </div></div>`).join('')}</div>`;
+}
+async function eqResolver(id, lado){
+  const p = state.pontos.find(x => x.id === id); if (!p || !p.conf) return;
+  if (lado === 'b') {
+    const q = p.conf; for (const k of EQ_CAMPOS) delete p[k]; p.lux = null; p.foto = null; p.hora = null;
+    Object.assign(p, q); if (q.foto) await fotoPut(p.id, q.foto); else fotoPut(p.id, null);
+  }
+  delete p.conf; await salvar({medicao:true}); renderTudo(); renderLevs();
+}
+/* ---------- aferição cruzada ---------- */
+function eqAferStats(){
+  const a = state.afer || []; if (!a.length) return null;
+  const vals = a.map(x => x.valor).filter(v => isFinite(v) && v > 0); if (!vals.length) return null;
+  const media = vals.reduce((s, v) => s + v, 0) / vals.length, lim = Number(state.aferLim) || 5;
+  const rows = a.map(x => ({...x, desv:media ? 100 * (x.valor - media) / media : 0}));
+  const max = Math.max(...rows.map(r => Math.abs(r.desv)));
+  const instrs = new Set(a.map(x => x.instr || x.eq)).size;
+  const dif = media ? 100 * (Math.max(...vals) - Math.min(...vals)) / media : 0;   // diferença entre o luxímetro que lê mais e o que lê menos
+  return {rows, media, lim, max, dif, alerta:instrs > 1 && dif > lim, instrs};
+}
+function eqRenderAfer(){
+  const st = eqAferStats(), box = $('eqAferTab');
+  $('eqAferLim').value = Number(state.aferLim) || 5;
+  if (!st) { box.innerHTML = '<p class="note" style="margin:6px 0 0">Nenhuma leitura de aferição registrada.</p>'; return; }
+  box.innerHTML = `<table class="eqt"><thead><tr><th>Equipe</th><th>Luxímetro</th><th style="text-align:right">Leitura</th><th style="text-align:right">Desvio</th><th></th></tr></thead><tbody>
+    ${st.rows.map((r, i) => `<tr><td>${esc(r.eq || '—')}${r.op ? '<br><span class="note" style="margin:0">' + esc(r.op) + '</span>' : ''}</td><td>${esc(r.instr || '—')}</td><td class="n">${laNum(r.valor)} lx</td><td class="n" style="color:${st.alerta ? 'var(--bad)' : 'var(--ok)'}">${r.desv >= 0 ? '+' : ''}${laNum(Math.round(r.desv * 10) / 10)} %</td><td><button type="button" class="btn ghost small" data-afdel="${i}" aria-label="Apagar leitura">✕</button></td></tr>`).join('')}
+    </tbody></table>
+    <p class="note" style="margin:6px 0 0">Média ${laNum(Math.round(st.media * 10) / 10)} lx · <b>diferença entre luxímetros ${laNum(Math.round(st.dif * 10) / 10)} %</b> (limite ${laNum(st.lim)} %)${st.instrs < 2 ? ' · registre a leitura dos outros luxímetros para comparar' : ''}</p>
+    ${st.alerta ? `<div class="erro" style="display:block;margin-top:6px">Os luxímetros divergem mais que ${laNum(st.lim)} %. A uniformidade (U0 = Emín/Eméd) pode ficar distorcida pelo instrumento: confira calibração e posição antes de medir, ou use o mesmo luxímetro na via toda.</div>` : ''}`;
+}
+async function eqRegistrarAfer(){
+  const e = eqLerForm(), v = luxDoCampo($('eqAferVal').value);
+  if (!e.instr) { toast('Informe o luxímetro deste aparelho (modelo · nº de série).'); $('eqInstr').focus(); return; }
+  if (!isFinite(v) || v < 0) { toast('Digite a leitura do ponto de referência (ex.: 12,4).'); $('eqAferVal').focus(); return; }
+  eqGuardar(e);
+  state.afer = (state.afer || []).concat([{eq:e.nome, op:e.op, instr:e.instr, valor:Math.round(v * 1000) / 1000, ref:$('eqAferRef').value.trim(), hora:new Date().toISOString()}]);
+  $('eqAferVal').value = ''; await salvar({semArquivo:true}); eqRenderAfer();
+}
+/* ---------- tela ---------- */
+function eqLerForm(){
+  const grupos = [...document.querySelectorAll('#eqGrupos input:checked')].map(i => i.value);
+  return {nome:$('eqNome').value.trim(), op:$('eqOp').value.trim(), instr:$('eqInstr').value.trim(), grupos};
+}
+function eqRender(){
+  if (!state || !state.pontos || !$('eqBox')) return;
+  const e = eqLocal(), gs = eqGrupos();
+  if (document.activeElement !== $('eqNome')) $('eqNome').value = e.nome;
+  if (document.activeElement !== $('eqOp')) $('eqOp').value = e.op;
+  if (document.activeElement !== $('eqInstr')) $('eqInstr').value = e.instr;
+  $('eqGrupos').innerHTML = gs.map(k => { const n = state.pontos.filter(p => eqGk(p) === k).length, m = state.pontos.filter(p => eqGk(p) === k && (p.lux != null || p.foto)).length;
+    return `<label class="eq-g"><input type="checkbox" value="${k}"${e.grupos.includes(k) ? ' checked' : ''}> ${eqGNome(k)} <span class="note" style="margin:0">${m}/${n}</span></label>`; }).join('');
+  const div = e.grupos.length && e.grupos.length < gs.length;
+  const minha = div ? state.pontos.filter(p => !eqFora(p)) : [];
+  $('eqSt').innerHTML = div ? `<b>Equipe ${esc(e.nome || '(sem nome)')}</b>: ${minha.filter(p => p.lux != null || p.foto).length} de ${minha.length} pontos da sua parte já com foto ou valor. Os outros pontos ficam apagados na malha e o “Medir próximo pendente” não passa por eles.`
+    : 'Sem divisão: este aparelho percorre todos os pontos. Marque abaixo só os grupos da sua equipe para dividir o trabalho.';
+  const eqs = Object.entries(state.equipes || {});
+  $('eqLista').innerHTML = eqs.length ? 'Equipes neste levantamento: ' + eqs.map(([n, x]) => `<b>${esc(n)}</b>${x.op ? ' (' + esc(x.op) + ')' : ''}${x.grupos && x.grupos.length ? ' — ' + x.grupos.map(eqGNome).join(', ') : ''}`).join(' · ') : '';
+  $('eqChip').hidden = !div; $('eqChip').textContent = div ? `Equipe ${e.nome || ''}: ${minha.filter(p => p.lux != null || p.foto).length}/${minha.length}` : '';
+  const nc = state.pontos.filter(p => p.conf).length; $('eqSum').textContent = nc ? ` — ${nc} conflito(s) para decidir` : div ? ` — equipe ${e.nome || ''}` : '';
+  eqRenderConf(); eqRenderAfer();
+}
+document.head.insertAdjacentHTML('beforeend', `<style>
+#eqBox>summary{cursor:pointer;font-weight:700;font-size:1.02rem}#eqSum{color:var(--bad);font-weight:700}
+.eq-gs{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}.eq-g{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-height:40px;font-weight:600}.eq-g input{width:20px;height:20px}
+.eqt{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:6px}.eqt th,.eqt td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top}.eqt td.n{text-align:right;font-family:var(--f-num, ui-monospace, monospace)}
+.eqc{display:grid;gap:10px}.eqc-card{border:1px solid var(--bad);border-radius:10px;padding:8px}.eqc-par{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.eqc-lado{display:flex;flex-direction:column;gap:4px}.eqc-lado img{width:100%;max-height:220px;object-fit:contain;background:#000;border-radius:6px}.eqc-sem{height:80px;display:grid;place-items:center;background:var(--surface-2);border-radius:6px;color:var(--muted);font-size:.8rem}
+.pt.fora{opacity:.25}.pt.conf .dot{stroke:var(--bad);stroke-width:4}
+</style>`);
+$('eqBox').addEventListener('change', e => {
+  if (e.target.closest('#eqGrupos') || ['eqNome', 'eqOp', 'eqInstr'].includes(e.target.id)) { eqGuardar(eqLerForm()); salvar({semArquivo:true}).catch(() => {}); renderTudo(); }
+  if (e.target.id === 'eqAferLim') { state.aferLim = Math.max(1, Number(String(e.target.value).replace(',', '.')) || 5); salvar({semArquivo:true}).catch(() => {}); eqRenderAfer(); }
+});
+$('eqBox').addEventListener('click', e => {
+  const u = e.target.closest('[data-usar]'); if (u) { eqResolver(u.closest('.eqc-card').dataset.id, u.dataset.usar); return; }
+  const d = e.target.closest('[data-afdel]'); if (d) { state.afer.splice(Number(d.dataset.afdel), 1); salvar({semArquivo:true}).catch(() => {}); eqRenderAfer(); }
+});
+$('eqConviteBtn').onclick = eqConvite;
+$('eqParteBtn').onclick = eqEnviarParte;
+$('eqMesclarIn').onchange = e => { eqMesclarArquivo(e.target.files[0]); e.target.value = ''; };
+$('eqAferBtn').onclick = eqRegistrarAfer;
+{ const _rt = renderTudo; renderTudo = function(){ _rt.apply(this, arguments); try { eqRender(); } catch (_) {} }; }
+setTimeout(() => { try { eqRender(); } catch (_) {} }, 1500);
 
 /* ---------- Conferência em grade ----------
    Todos os pontos com foto e sem valor numa grade: recorte do visor, valor sugerido (editável) e “conferido”.
