@@ -180,7 +180,7 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
   <div class="actions">
     <button class="btn primary" id="btnArq">Salvar arquivo no aparelho</button>
     <label class="btn ghost" for="inJson">Abrir arquivo salvo</label>
-    <input id="inJson" type="file" accept="application/json,.json,.txt,text/plain" hidden>
+    <input id="inJson" type="file" accept="application/json,.json,.txt,text/plain,.zip,application/zip" hidden>
     <button class="btn ghost" id="btnNovo">Novo levantamento</button>
   </div>
   <div class="actions" id="bkWrap" style="margin-top:8px">
@@ -210,7 +210,7 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
     <div class="actions">
       <button class="btn primary" type="button" id="eqConviteBtn">Enviar convite para a equipe</button>
       <button class="btn ghost" type="button" id="eqParteBtn">Enviar minha parte (com fotos)</button>
-      <label class="btn accent" for="eqMesclarIn">Mesclar parte de outra equipe</label><input id="eqMesclarIn" type="file" accept="application/json,.json,.txt,text/plain" hidden>
+      <label class="btn accent" for="eqMesclarIn">Mesclar parte de outra equipe</label><input id="eqMesclarIn" type="file" accept="application/json,.json,.txt,text/plain,.zip,application/zip" hidden>
     </div>
     <div id="eqConf" hidden></div>
     <h4 style="margin:16px 0 4px">Aferição cruzada dos luxímetros</h4>
@@ -269,6 +269,11 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
         <option value="bf">Bilateral frente a frente</option>
         <option value="ba">Bilateral alternado</option>
         <option value="cc">Canteiro central</option>
+      </select></div>
+    <div class="fld"><label for="lumPoste">Luminárias por poste</label>
+      <select id="lumPoste">
+        <option value="1">Simples (1 luminária)</option>
+        <option value="2">Dupla (2 luminárias)</option>
       </select></div>
   </div>
 
@@ -369,7 +374,8 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
     <button class="btn accent" id="btnPdf">Exportar PDF</button>
     <button class="btn ghost" id="btnCsv">Exportar CSV</button>
     <button class="btn primary" id="btnPacote">Exportar pasta completa (.zip)</button>
-    <button class="btn accent" id="btnPacoteZap">Enviar pasta completa (.zip) pelo WhatsApp</button>
+    <button class="btn accent" id="btnPacoteZap">Compartilhar pasta completa (WhatsApp, e-mail…)</button>
+    <button class="btn ghost" id="btnPdfShare">Compartilhar PDF (WhatsApp, e-mail…)</button>
   </div>
   <div class="lf">
     <h3 style="margin-top:0">Leitura das fotos</h3>
@@ -594,7 +600,7 @@ function lerCfg(){
     S:num($('S').value), L:num($('L').value), faixas:Math.round(num($('faixas').value)),
     calc:document.querySelector('input[name=calc]:checked').value,
     Lc1:num($('Lc1').value), Lc2:num($('Lc2').value),
-    postes:$('postes').value, classeC:$('classeC').value, classeP:$('classeP').value,
+    postes:$('postes').value, lumPoste:$('lumPoste').value, classeC:$('classeC').value, classeP:$('classeP').value,
     canteiro:$('canteiro').value, Lcan:num($('Lcan').value), canPos:Math.round(num($('canPos').value)),
     ciclo:$('ciclo').value, Lciclo:num($('Lciclo').value), estac:$('estac').value, estLado:$('estLado').value, Lest:num($('Lest').value), sinal:$('sinal').value,
     obs:$('obs').value
@@ -604,7 +610,7 @@ function escreverCfg(c){
   ['municipio','via','data','resp','luximetro','S','L','faixas','Lc1','Lc2','postes','classeC','classeP']
     .forEach(k => { if (c[k] !== undefined && c[k] !== null && !Number.isNaN(c[k]) && $(k)) $(k).value = typeof c[k] === 'number' ? String(c[k]).replace('.', ',') : c[k]; });
   $('obs').value = c.obs || '';
-  const DEF = {canteiro:'nao', Lcan:2, canPos:1, ciclo:'nao', Lciclo:2, estac:'nao', estLado:'1', Lest:null, sinal:'nao'};
+  const DEF = {canteiro:'nao', Lcan:2, canPos:1, ciclo:'nao', Lciclo:2, estac:'nao', estLado:'1', Lest:null, sinal:'nao', lumPoste:'1'};
   for (const k in DEF) {   // levantamentos antigos não têm estes campos: assumem o padrão
     if (c[k] === undefined) c[k] = DEF[k];
     $(k).value = (c[k] === null || Number.isNaN(c[k])) ? '' : String(c[k]).replace('.', ',');
@@ -777,6 +783,7 @@ function elementosTxt(c){
   if (cicOn(c)) t.push(`ciclovia/ciclofaixa ${fmt(c.Lciclo)} m ${CIC_TXT[c.ciclo]}`);
   if (c.estac && c.estac !== 'nao') t.push(`estacionamento ${EST_TXT[c.estac]} (${c.estLado === 'ambos' ? 'ambos os lados' : 'lado ' + (c.estLado === '2' ? 2 : 1)}, prof. ${fmt(c.Lest > 0 ? c.Lest : EST_PROF[c.estac])} m)`);
   if (c.sinal && c.sinal !== 'nao') t.push(SIN_TXT[c.sinal]);
+  if (c.lumPoste === '2') t.push(c.postes === 'cc' ? 'poste com luminária dupla (uma para cada pista)' : 'poste com luminária dupla (via e passeio)');
   return t.join(' · ');
 }
 function svgMalha(){
@@ -840,13 +847,24 @@ function svgMalha(){
   const arr = {u1:[[0,1],[S,1]], u2:[[0,2],[S,2]], bf:[[0,1],[S,1],[0,2],[S,2]], ba:[[0,1],[S,2]], cc:can ? [[0,'c'],[S,'c']] : []}[cfg.postes] || [];
   const w1p = B[0].h, w2p = B[B.length-1].h, armLen = Math.min(1.5, roadH/2) * sy, glowR = Math.min(roadH, 5) * sy;
   let glows = '', posts = '';
+  const dupla = cfg.lumPoste === '2';
+  const lum = (px, py, ly, r) => { glows += `<circle class="glow" cx="${px}" cy="${ly}" r="${r}"/>`; return `<line class="arm" x1="${px}" y1="${py}" x2="${px}" y2="${ly}"/><circle class="lum" cx="${px}" cy="${ly}" r="7"/>`; };
   arr.forEach(([x, lado]) => {
     const px = X(x);
-    if (lado === 'c') { const cy = Y(can.y0 + can.h/2); glows += `<circle class="glow" cx="${px}" cy="${cy}" r="${glowR}"/>`; posts += `<circle class="post" cx="${px}" cy="${cy}" r="6"/><circle class="lum" cx="${px}" cy="${cy}" r="7"/>`; return; }
+    if (lado === 'c') {   // canteiro: dupla = uma luminária para cada pista
+      const cy = Y(can.y0 + can.h/2), a = Math.min(armLen, (can.h/2 + 1.2) * sy);
+      posts += dupla ? lum(px, cy, cy - a, glowR) + lum(px, cy, cy + a, glowR) + `<circle class="post" cx="${px}" cy="${cy}" r="6"/>`
+                     : (glows += `<circle class="glow" cx="${px}" cy="${cy}" r="${glowR}"/>`, `<circle class="post" cx="${px}" cy="${cy}" r="6"/><circle class="lum" cx="${px}" cy="${cy}" r="7"/>`);
+      return;
+    }
     const py = lado === 1 ? curb1 - Math.min(.4, w1p/2)*sy : curb2 + Math.min(.4, w2p/2)*sy;
     const ly = lado === 1 ? curb1 + armLen : curb2 - armLen;
-    glows += `<circle class="glow" cx="${px}" cy="${ly}" r="${glowR}"/>`;
-    posts += `<line class="arm" x1="${px}" y1="${py}" x2="${px}" y2="${ly}"/><circle class="post" cx="${px}" cy="${py}" r="6"/><circle class="lum" cx="${px}" cy="${ly}" r="7"/>`;
+    posts += lum(px, py, ly, glowR);
+    if (dupla) {   // lateral: dupla = uma luminária para a via e outra para o passeio
+      const wp = lado === 1 ? w1p : w2p, a2 = Math.max(10, Math.min(1.2, wp * .7) * sy), ly2 = lado === 1 ? py - a2 : py + a2;
+      posts += lum(px, py, ly2, Math.min(glowR, Math.max(wp, 1.5) * sy));
+    }
+    posts += `<circle class="post" cx="${px}" cy="${py}" r="6"/>`;
   });
   s += `<g clip-path="url(#clipVia)">${glows}</g>` + posts;
   pontos.forEach((p, i) => {
@@ -1293,10 +1311,10 @@ function renderArmazenamento(){
 
 async function importarJSON(file){
   if (!file) return;
-  const r = new FileReader();
+  const r = {readAsText(){ r.onload(); }};   // lê .json, .json.txt ou o .zip da pasta completa
   r.onload = async () => {
     try {
-      const o = JSON.parse(r.result);
+      const o = await lerArqLev(file);
       if (!o || !o.cfg || !Array.isArray(o.pontos)) throw new Error();
       const levs = await listarLevs() || [];
       let id = o.id || novoId();
@@ -3292,10 +3310,10 @@ document.querySelectorAll('input[name=calc]').forEach(r => r.onchange = () => { 
 ['S','L','faixas','Lc1','Lc2'].forEach(k => $(k).addEventListener('input', checarDirty));
 ['canteiro','Lcan','canPos','ciclo','Lciclo','estac','estLado','Lest'].forEach(k => $(k).addEventListener('input', () => { syncElemUI(); checarDirty(); }));
 let tCfg = null;
-['municipio','via','data','resp','luximetro','postes','classeC','classeP','sinal','obs'].forEach(k => $(k).addEventListener('input', () => {
+['municipio','via','data','resp','luximetro','postes','lumPoste','classeC','classeP','sinal','obs'].forEach(k => $(k).addEventListener('input', () => {
   if (!state.cfg) return;
   state.cfg[k] = $(k).value.trim();
-  if (['postes','classeC','classeP','sinal'].includes(k)) renderTudo();
+  if (['postes','lumPoste','classeC','classeP','sinal'].includes(k)) renderTudo();
   clearTimeout(tCfg); tCfg = setTimeout(async () => { await salvar(); renderLevs(); }, 500);
 }));
 $('levs').addEventListener('click', e => {
@@ -3373,22 +3391,31 @@ async function montarPacote(){
     const bs = atob(p.foto.split(',')[1]), u = new Uint8Array(bs.length); for (let i = 0; i < bs.length; i++) u[i] = bs.charCodeAt(i);
     arq.push([raiz + '/fotos/ponto_' + String(nro(p)).padStart(3, '0') + '.jpg', u]); nf++;
   }
-  return {blob:zipar(arq), nome:raiz + '.zip', nf};
+  const partes = cap.map(([n, bl]) => ({blob:bl, nome:n, tipo:bl.type.split(';')[0]})).concat([{blob:new Blob([jsonTexto()], {type:'application/json'}), nome:raiz + '.json', tipo:'application/json'}]);
+  return {blob:zipar(arq), nome:raiz + '.zip', nf, partes};
 }
 async function exportarPacote(zap){
   if (!state.cfg) { toast('Nenhum levantamento aberto.'); return; }
   const b = $(zap ? 'btnPacoteZap' : 'btnPacote'), t0 = b.textContent; b.disabled = true; b.textContent = 'Montando pasta…';
   try {
-    const {blob, nome, nf} = await montarPacote();
+    const {blob, nome, nf, partes} = await montarPacote();
     if (!zap) { baixar(blob, nome); toast(`Pacote salvo em Downloads: ${nome} (${nf} foto(s)). Extraia no app Meus Arquivos para criar a pasta.`, 7000); return; }
-    const r = await compartilharComRetry(blob, nome, `Levantamento ${state.cfg.via || ''} — pasta completa`, [['application/zip', nome]]);
-    if (r === 'share') toast('Pasta enviada. Escolha o WhatsApp e o contato na janela de compartilhamento.', 5000);
-    else if (r === 'download') toast(`O Chrome não liberou o compartilhamento do .zip. Ele foi salvo em Downloads: no WhatsApp use Anexar › Documento › ${nome}.`, 9000);
+    b.disabled = false; b.textContent = t0;
+    const r = await compartilhar({titulo:`Levantamento ${state.cfg.via || ''} — pasta completa (${nf} foto(s))`, arquivos:[{blob, nome, tipo:'application/zip'}], alternativa:partes});
+    if (r === 'share') toast('Enviado.', 3000);
   } catch(e) { _cap = null; toast('Não foi possível montar o pacote: ' + (e && e.message ? e.message : e), 7000); }
   finally { b.disabled = false; b.textContent = t0; }
 }
 $('btnPacote').onclick = () => exportarPacote(false);
 $('btnPacoteZap').onclick = () => exportarPacote(true);
+$('btnPdfShare').onclick = async () => {
+  if (!state.cfg) { toast('Nenhum levantamento aberto.'); return; }
+  const b = $('btnPdfShare'), t0 = b.textContent; b.disabled = true; b.textContent = 'Gerando PDF…';
+  try { const blob = new Blob([await montarPDF()], {type:'application/pdf'}); b.disabled = false; b.textContent = t0;
+    await compartilhar({titulo:`Relatório ${state.cfg.via || ''} — NBR 5101`, arquivos:[{blob, nome:nomePDF(), tipo:'application/pdf'}]}); }
+  catch (e) { toast('Não foi possível gerar o PDF: ' + (e && e.message ? e.message : e), 7000); }
+  finally { b.disabled = false; b.textContent = t0; }
+};
 
 /* ---------- Leitura das fotos no escritório (em lote) ----------
    Gera uma SUGESTÃO de valor (p.sug) para cada ponto com foto e sem valor. A sugestão não entra na conformidade:
@@ -3647,7 +3674,7 @@ setTimeout(() => { try { lfFundoRetomar(); } catch (_) {} }, 2500);
    A equipe e a parte deste aparelho ficam guardadas só neste aparelho; equipes, aferições e conflitos viajam no arquivo. */
 const EQ_CAMPOS = ['lux','foto','hora','auto','imp','ocr','sug','sugOrig','sugInf','sugEsc','sugLido','lfTent','iaPend','lidoPor','esc','eq','op','instr'];
 const eqGk = p => p.kind + ':' + p.g;
-const eqGNome = k => { const [kind, g] = k.split(':'); return kind === 'via' ? `Faixa ${g}` : `Passeio ${g}`; };
+const eqGNome = k => { const [kind, g] = k.split(':'); return grupoNome({kind, g:Number(g)}); };   // Passeio, Faixa ou Ciclovia
 function eqGrupos(){ const v = []; for (const p of state.pontos || []) { const k = eqGk(p); if (!v.includes(k)) v.push(k); } return v; }
 function eqPadrao(){ try { return JSON.parse(localStorage.getItem('malhaNBR5101.eqPadrao') || 'null') || {}; } catch (e) { return {}; } }
 function eqLocal(){
@@ -3670,35 +3697,93 @@ function eqFora(p){
 }
 function eqCarimbar(p){ const e = eqLocal(); if (e.nome) p.eq = e.nome; if (e.op) p.op = e.op; if (e.instr) p.instr = e.instr; }
 /* ---------- arquivos: convite, minha parte, mesclar ---------- */
-/* Compartilhar arquivo (abre a lista de apps, com o WhatsApp). O Chrome do Android só libera alguns tipos de arquivo:
-   tenta o tipo real e, se recusado, um tipo aceito; se nada servir, salva em Downloads. */
-async function compartilharArquivo(blob, nome, titulo, tipos){
-  if (!navigator.share) return 'download';
-  let negado = false;
-  for (const [t, n] of tipos) {
-    try {
-      const f = new File([blob], n || nome, {type:t});
-      if (navigator.canShare && !navigator.canShare({files:[f]})) continue;
-      await navigator.share({files:[f], title:titulo, text:titulo}); return 'share';
-    } catch (e) {
+/* ---------- Compartilhar (WhatsApp, e-mail, Drive, Bluetooth…) ----------
+   Por que falhava no celular: (1) a lista de apps só abre logo após um toque — o arquivo demorava a ficar pronto e o
+   toque expirava; (2) o Chrome do Android não compartilha .json nem .zip (aceita PDF, imagens, .txt, .csv, .html);
+   (3) com o app aberto direto do arquivo (sem https), o navegador desliga o compartilhamento de arquivos.
+   Agora: o arquivo é preparado, uma janela mostra “Compartilhar” — esse toque abre a lista de apps — e, antes, escolhe-se
+   um formato aceito: .json vai como .json.txt (o app abre igual); se o .zip for recusado, vão o relatório (.html, com as
+   fotos), a planilha (.csv) e os dados (.json.txt, para abrir ou mesclar no app). Sem compartilhamento, salva no aparelho
+   e abre o e-mail ou o WhatsApp para anexar. */
+const shTam = n => n < 1048576 ? Math.max(1, Math.round(n / 1024)) + ' KB' : (n / 1048576).toFixed(1).replace('.', ',') + ' MB';
+const shPode = () => !!(navigator.share && navigator.canShare);
+const shOk = files => { try { return navigator.canShare({files}); } catch (e) { return false; } };
+function shVariantes(a){
+  const v = [new File([a.blob], a.nome, {type:a.tipo || a.blob.type || 'application/octet-stream'})];
+  if (/\.json$/i.test(a.nome)) v.push(new File([a.blob], a.nome + '.txt', {type:'text/plain'}));
+  return v;
+}
+function shEscolher(conjuntos){   // primeira combinação de arquivos que o celular aceita compartilhar
+  if (!shPode()) return null;
+  for (let i = 0; i < conjuntos.length; i++) {
+    const files = [];
+    for (const a of conjuntos[i]) { const f = shVariantes(a).find(x => shOk([x])); if (!f) { files.length = 0; break; } files.push(f); }
+    if (files.length && shOk(files)) return {files, alt:i > 0};
+  }
+  return null;
+}
+const shArquivoAberto = () => !window.isSecureContext || /^(file|content):/.test(location.protocol);
+async function compartilhar({titulo, arquivos, alternativa}){
+  const tot = arquivos.reduce((s, a) => s + a.blob.size, 0), nomes = arquivos.map(a => a.nome).join(', ');
+  const esc = shEscolher([arquivos].concat(alternativa ? [alternativa] : []));
+  const salvar = () => { for (const a of arquivos) baixar(a.blob, a.nome); };
+  if (esc) {
+    const txt = esc.files.some(f => /\.json\.txt$/.test(f.name));
+    const msg = `Pronto para enviar: ${nomes} (${shTam(tot)}).` +
+      (esc.alt ? ' Este celular não envia .zip pela lista de apps: vão o relatório (.html, com as fotos), a planilha (.csv) e os dados (.json.txt, que o app abre e mescla).' : txt ? ' Os dados vão como .json.txt: o app abre e mescla normalmente.' : '') +
+      ' Toque em Compartilhar e escolha o WhatsApp, o e-mail ou outro app.';
+    const v = await pedir(msg, [{t:'Compartilhar (WhatsApp, e-mail…)', v:'share', cls:'primary'}, {t:'Salvar no aparelho', v:'save'}, {t:'Cancelar', v:null}]);
+    if (!v) return 'cancel';
+    if (v === 'save') { salvar(); return 'download'; }
+    try { await navigator.share({files:esc.files, title:titulo, text:titulo}); return 'share'; }
+    catch (e) {
       if (e && e.name === 'AbortError') return 'cancel';
-      if (e && e.name === 'NotAllowedError') negado = true;   // o toque expirou (arquivo grande demorou a ficar pronto)
+      salvar(); toast('O celular não abriu a lista de apps. O arquivo foi salvo no aparelho: anexe pelo WhatsApp (Anexar › Documento) ou pelo e-mail.', 8000); return 'download';
     }
   }
-  return negado ? 'gesto' : 'download';
+  const msg = `Pronto: ${nomes} (${shTam(tot)}). ` + (shArquivoAberto()
+    ? 'O app foi aberto direto do arquivo, e nesse modo o celular não deixa compartilhar. Para enviar direto pela lista de apps, abra o app pelo endereço https (no Chrome ou no Safari).'
+    : 'Este navegador não envia este tipo de arquivo pela lista de apps.') + ' Salve no aparelho e anexe na mensagem:';
+  const v = await pedir(msg, [{t:'Salvar e abrir o WhatsApp', v:'zap', cls:'primary'}, {t:'Salvar e abrir o e-mail', v:'mail'}, {t:'Só salvar no aparelho', v:'save'}, {t:'Cancelar', v:null}]);
+  if (!v) return 'cancel';
+  salvar();
+  const texto = `${titulo}. Arquivo em anexo: ${nomes}.`;
+  if (v === 'zap') setTimeout(() => window.open('https://wa.me/?text=' + encodeURIComponent(texto + ' (no WhatsApp: Anexar › Documento › Downloads)'), '_blank'), 600);
+  if (v === 'mail') setTimeout(() => { location.href = 'mailto:?subject=' + encodeURIComponent(titulo) + '&body=' + encodeURIComponent(texto + '\n\nO arquivo foi salvo em Downloads: anexe-o a este e-mail.'); }, 600);
+  toast(`Salvo no aparelho: ${nomes}. Anexe o arquivo da pasta Downloads.`, 8000);
+  return 'download';
 }
-async function compartilharComRetry(blob, nome, titulo, tipos){
-  let r = await compartilharArquivo(blob, nome, titulo, tipos);
-  if (r === 'gesto') {
-    const ok = await pedir('Arquivo pronto. Toque em “Compartilhar” para escolher o WhatsApp ou outro app.', [{t:'Compartilhar', v:true, cls:'primary'}, {t:'Salvar no aparelho', v:false}]);
-    r = ok ? await compartilharArquivo(blob, nome, titulo, tipos) : 'download';
+/* ---------- abrir .json, .json.txt ou o .zip da pasta completa ---------- */
+async function inflarZip(raw){
+  if (typeof DecompressionStream === 'undefined') throw new Error('este navegador não descompacta .zip comprimido; extraia o .json e abra ele');
+  const s = new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(s).arrayBuffer());
+}
+async function lerZipJson(u){
+  const dv = new DataView(u.buffer, u.byteOffset, u.byteLength); let e = -1;
+  for (let i = u.length - 22; i >= Math.max(0, u.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new Error('zip inválido');
+  const n = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true), achado = null;
+  for (let k = 0; k < n; k++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const met = dv.getUint16(p + 10, true), csz = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    const nome = new TextDecoder().decode(u.subarray(p + 46, p + 46 + nl)); p += 46 + nl + xl + cl;
+    if (!/\.json(\.txt)?$/i.test(nome) || /(^|\/)fotos\//.test(nome)) continue;
+    const lnl = dv.getUint16(off + 26, true), lxl = dv.getUint16(off + 28, true), ini = off + 30 + lnl + lxl, raw = u.subarray(ini, ini + csz);
+    achado = met === 0 ? raw : met === 8 ? await inflarZip(raw) : null;
+    if (achado) break;
   }
-  if (r === 'download') baixar(blob, nome);
-  return r;
+  if (!achado) throw new Error('o .zip não tem o arquivo .json do levantamento');
+  return JSON.parse(new TextDecoder().decode(achado));
 }
+async function lerArqLev(file){
+  const u = new Uint8Array(await file.arrayBuffer());
+  if (u[0] === 0x50 && u[1] === 0x4b) return lerZipJson(u);   // .zip ("PK")
+  return JSON.parse(new TextDecoder().decode(u).replace(/^﻿/, ''));
+}
+
 async function eqCompartilhar(texto, nome, titulo){
-  const blob = new Blob([texto], {type:'application/json'});
-  return compartilharComRetry(blob, nome, titulo, [['application/json', nome], ['text/plain', nome + '.txt']]);
+  return compartilhar({titulo, arquivos:[{blob:new Blob([texto], {type:'application/json'}), nome, tipo:'application/json'}]});
 }
 async function eqConvite(){
   if (!state.cfg) { toast('Nenhum levantamento aberto.'); return; }
@@ -3748,13 +3833,11 @@ async function eqMesclar(o){
   await salvar({medicao:true}); renderTudo(); renderLevs();
   return {novos, conflitos, iguais};
 }
-function eqLerArquivo(file){
-  return new Promise((ok, er) => { const r = new FileReader(); r.onload = () => { try { ok(JSON.parse(r.result)); } catch (e) { er(e); } }; r.onerror = er; r.readAsText(file); });
-}
+const eqLerArquivo = file => lerArqLev(file);   // .json, .json.txt ou .zip
 async function eqMesclarArquivo(file){
   if (!file) return;
   if (!state.cfg) { toast('Abra primeiro o levantamento que vai receber as partes.'); return; }
-  let o; try { o = await eqLerArquivo(file); } catch (e) { toast('Arquivo inválido. Use um .json salvo por esta ferramenta.'); return; }
+  let o; try { o = await eqLerArquivo(file); } catch (e) { toast('Arquivo inválido. Use o .json, .json.txt ou .zip salvo por esta ferramenta.'); return; }
   if (!o || !o.cfg || !Array.isArray(o.pontos)) { toast('Arquivo inválido. Use um .json salvo por esta ferramenta.'); return; }
   if (o.id && o.id !== state.id) {
     const levs = await listarLevs() || [];
