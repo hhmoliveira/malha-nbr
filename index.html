@@ -180,7 +180,7 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
   <div class="actions">
     <button class="btn primary" id="btnArq">Salvar arquivo no aparelho</button>
     <label class="btn ghost" for="inJson">Abrir arquivo salvo</label>
-    <input id="inJson" type="file" accept="application/json,.json" hidden>
+    <input id="inJson" type="file" accept="application/json,.json,.txt,text/plain" hidden>
     <button class="btn ghost" id="btnNovo">Novo levantamento</button>
   </div>
   <div class="actions" id="bkWrap" style="margin-top:8px">
@@ -210,7 +210,7 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
     <div class="actions">
       <button class="btn primary" type="button" id="eqConviteBtn">Enviar convite para a equipe</button>
       <button class="btn ghost" type="button" id="eqParteBtn">Enviar minha parte (com fotos)</button>
-      <label class="btn accent" for="eqMesclarIn">Mesclar parte de outra equipe</label><input id="eqMesclarIn" type="file" accept="application/json,.json" hidden>
+      <label class="btn accent" for="eqMesclarIn">Mesclar parte de outra equipe</label><input id="eqMesclarIn" type="file" accept="application/json,.json,.txt,text/plain" hidden>
     </div>
     <div id="eqConf" hidden></div>
     <h4 style="margin:16px 0 4px">Aferição cruzada dos luxímetros</h4>
@@ -268,6 +268,7 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
         <option value="u2">Unilateral · lado 2</option>
         <option value="bf">Bilateral frente a frente</option>
         <option value="ba">Bilateral alternado</option>
+        <option value="cc">Canteiro central</option>
       </select></div>
   </div>
 
@@ -285,6 +286,20 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
     <div class="fld" id="fldLc1"><label for="Lc1">Largura passeio lado 1 (m)</label><input id="Lc1" type="text" inputmode="decimal" autocomplete="off" value="2"></div>
     <div class="fld" id="fldLc2"><label for="Lc2">Largura passeio lado 2 (m)</label><input id="Lc2" type="text" inputmode="decimal" autocomplete="off" value="2"></div>
   </div>
+
+  <h3>Canteiro, ciclovia, estacionamento e sinalização</h3>
+  <div class="grid">
+    <div class="fld"><label for="canteiro">Canteiro central</label><select id="canteiro"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
+    <div class="fld" id="fldCan1"><label for="Lcan">Largura do canteiro (m)</label><input id="Lcan" type="text" inputmode="decimal" autocomplete="off" value="2"></div>
+    <div class="fld" id="fldCan2"><label for="canPos">Fica após a faixa nº</label><input id="canPos" type="text" inputmode="numeric" autocomplete="off" value="1"></div>
+    <div class="fld"><label for="ciclo">Ciclovia / ciclofaixa</label><select id="ciclo"><option value="nao">Não</option><option value="p1">Junto ao passeio 1</option><option value="p2">Junto ao passeio 2</option><option value="can">No canteiro central</option><option value="f1">Na faixa 1</option><option value="f2">Na faixa 2 (última)</option></select></div>
+    <div class="fld" id="fldCic"><label for="Lciclo">Largura da ciclovia (m)</label><input id="Lciclo" type="text" inputmode="decimal" autocomplete="off" value="2"></div>
+    <div class="fld"><label for="estac">Estacionamento na via</label><select id="estac"><option value="nao">Não</option><option value="par">Paralelo ao passeio</option><option value="45">45°</option><option value="90">90°</option></select></div>
+    <div class="fld" id="fldEst1"><label for="estLado">Lado do estacionamento</label><select id="estLado"><option value="1">Lado 1</option><option value="2">Lado 2</option><option value="ambos">Ambos</option></select></div>
+    <div class="fld" id="fldEst2"><label for="Lest">Profundidade (m)</label><input id="Lest" type="text" inputmode="decimal" autocomplete="off" placeholder="padrão"></div>
+    <div class="fld"><label for="sinal">Sinalização</label><select id="sinal"><option value="nao">Nenhuma</option><option value="h">Horizontal</option><option value="v">Vertical</option><option value="hv">Horizontal e vertical</option></select></div>
+  </div>
+  <p class="note">A ciclovia “junto ao passeio” fica entre o passeio e a via; a ciclofaixa “na faixa” ocupa parte da largura da faixa; no canteiro, fica no centro dele. A ciclovia recebe pontos de medição (classe do passeio). Canteiro e estacionamento aparecem no desenho, mas não recebem pontos.</p>
 
   <h3>Classe de iluminação</h3>
   <div class="grid">
@@ -311,6 +326,7 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
   <div class="legend">
     <span><i style="background:var(--via)"></i><span id="lgVia">Via C5</span></span>
     <span id="lgPedWrap"><i style="background:var(--ped)"></i><span id="lgPed">Passeio P5</span></span>
+    <span id="lgCicWrap" hidden><i style="background:#9b4dca"></i>Ciclovia</span>
     <span><i style="background:var(--ok)"></i>Medido (valor acima do ponto)</span>
     <span class="sp"></span>
     <button class="btn ghost small" id="btnFit">Ajustar à tela</button>
@@ -353,6 +369,7 @@ details.maps summary{cursor:pointer;font-weight:600;color:var(--fg)}
     <button class="btn accent" id="btnPdf">Exportar PDF</button>
     <button class="btn ghost" id="btnCsv">Exportar CSV</button>
     <button class="btn primary" id="btnPacote">Exportar pasta completa (.zip)</button>
+    <button class="btn accent" id="btnPacoteZap">Enviar pasta completa (.zip) pelo WhatsApp</button>
   </div>
   <div class="lf">
     <h3 style="margin-top:0">Leitura das fotos</h3>
@@ -578,6 +595,8 @@ function lerCfg(){
     calc:document.querySelector('input[name=calc]:checked').value,
     Lc1:num($('Lc1').value), Lc2:num($('Lc2').value),
     postes:$('postes').value, classeC:$('classeC').value, classeP:$('classeP').value,
+    canteiro:$('canteiro').value, Lcan:num($('Lcan').value), canPos:Math.round(num($('canPos').value)),
+    ciclo:$('ciclo').value, Lciclo:num($('Lciclo').value), estac:$('estac').value, estLado:$('estLado').value, Lest:num($('Lest').value), sinal:$('sinal').value,
     obs:$('obs').value
   };
 }
@@ -585,14 +604,32 @@ function escreverCfg(c){
   ['municipio','via','data','resp','luximetro','S','L','faixas','Lc1','Lc2','postes','classeC','classeP']
     .forEach(k => { if (c[k] !== undefined && c[k] !== null && !Number.isNaN(c[k]) && $(k)) $(k).value = typeof c[k] === 'number' ? String(c[k]).replace('.', ',') : c[k]; });
   $('obs').value = c.obs || '';
+  const DEF = {canteiro:'nao', Lcan:2, canPos:1, ciclo:'nao', Lciclo:2, estac:'nao', estLado:'1', Lest:null, sinal:'nao'};
+  for (const k in DEF) {   // levantamentos antigos não têm estes campos: assumem o padrão
+    if (c[k] === undefined) c[k] = DEF[k];
+    $(k).value = (c[k] === null || Number.isNaN(c[k])) ? '' : String(c[k]).replace('.', ',');
+  }
   const r = document.querySelector(`input[name=calc][value="${c.calc}"]`); if (r) r.checked = true;
-  syncCalcUI(); $('dirty').hidden = true;
+  syncElemUI(); syncCalcUI(); $('dirty').hidden = true;
 }
 function validar(c){
   if (!(c.S > 0)) return {campo:'S', msg:'Informe a distância entre luminárias S.'};
   if (!(c.L > 0)) return {campo:'L', msg:'Informe a largura da faixa.'};
   if (!(c.faixas >= 1 && c.faixas <= 8)) return {campo:'faixas', msg:'O nº de faixas deve ficar entre 1 e 8.'};
   for (const l of ladosDe(c.calc)) if (!(c['Lc'+l] > 0)) return {campo:'Lc'+l, msg:`Informe a largura do passeio do lado ${l}.`};
+  if (c.canteiro === 'sim') {
+    if (!(c.faixas >= 2)) return {campo:'canteiro', msg:'O canteiro central exige pelo menos 2 faixas.'};
+    if (!(c.Lcan > 0)) return {campo:'Lcan', msg:'Informe a largura do canteiro central.'};
+    if (!(c.canPos >= 1 && c.canPos <= c.faixas - 1)) return {campo:'canPos', msg:`O canteiro fica após uma faixa de 1 a ${c.faixas - 1}.`};
+  }
+  if (c.ciclo && c.ciclo !== 'nao') {
+    if (!(c.Lciclo > 0)) return {campo:'Lciclo', msg:'Informe a largura da ciclovia.'};
+    if (c.ciclo === 'can' && c.canteiro !== 'sim') return {campo:'ciclo', msg:'Para a ciclovia no canteiro central, ative o canteiro central.'};
+    if (c.ciclo === 'can' && c.Lciclo > c.Lcan) return {campo:'Lciclo', msg:'A ciclovia não pode ser mais larga que o canteiro central.'};
+    if ((c.ciclo === 'f1' || c.ciclo === 'f2') && c.Lciclo >= c.L) return {campo:'Lciclo', msg:'A ciclofaixa precisa ser mais estreita que a faixa.'};
+    if (c.ciclo === 'p1' && !ladosDe(c.calc).includes(1)) return {campo:'ciclo', msg:'Não há passeio no lado 1 para a ciclovia ficar junto a ele.'};
+    if (c.ciclo === 'p2' && !ladosDe(c.calc).includes(2)) return {campo:'ciclo', msg:'Não há passeio no lado 2 para a ciclovia ficar junto a ele.'};
+  }
   return null;
 }
 function mostrarErro(err, rolar){
@@ -602,6 +639,11 @@ function mostrarErro(err, rolar){
   $('errbox').textContent = err.msg + ' A malha ainda não foi gerada.';
   $(err.campo).classList.add('erro');
   if (rolar) { $(err.campo).scrollIntoView({behavior:'smooth', block:'center'}); setTimeout(() => $(err.campo).focus({preventScroll:true}), 350); }
+}
+function syncElemUI(){
+  $('fldCan1').hidden = $('fldCan2').hidden = $('canteiro').value !== 'sim';
+  $('fldCic').hidden = $('ciclo').value === 'nao';
+  $('fldEst1').hidden = $('fldEst2').hidden = $('estac').value === 'nao';
 }
 function syncCalcUI(){
   const ls = ladosDe(document.querySelector('input[name=calc]:checked').value);
@@ -613,7 +655,8 @@ let tAuto = null;
 function checarDirty(){
   if (!state.cfg) { $('dirty').hidden = true; return; }
   const c = lerCfg(), o = state.cfg, ls = ladosDe(c.calc);
-  const dif = ['S','L','faixas','calc'].some(k => c[k] !== o[k]) || ls.some(l => c['Lc'+l] !== o['Lc'+l]);
+  const nz = v => (v == null || (typeof v === 'number' && Number.isNaN(v))) ? '' : v;
+  const dif = ['S','L','faixas','calc','canteiro','Lcan','canPos','ciclo','Lciclo','estac','estLado','Lest'].some(k => nz(c[k]) !== nz(o[k])) || ls.some(l => c['Lc'+l] !== o['Lc'+l]);
   clearTimeout(tAuto);
   if (!dif) { $('dirty').hidden = true; mostrarErro(null); return; }
   const err = validar(c);
@@ -637,18 +680,19 @@ async function gerar(novo, silencioso){
   if (err) return false;
   const med = novo ? 0 : nMed();
   if (med && !(await confirmar(`Gerar a nova malha apaga ${med} medição(ões) deste levantamento.`, 'Gerar e apagar medições', 'danger'))) return false;
-  const N = calcN(cfg.S), D = cfg.S / N, pts = [], ls = ladosDe(cfg.calc);
+  const N = calcN(cfg.S), D = cfg.S / N, pts = [];
   let n = 1; const nid = () => 'P' + String(n++).padStart(3,'0');
-  const passeio = l => {
-    const Lc = cfg['Lc'+l], k = nTransP(Lc), st = Lc / k;
+  const lay = layout(cfg), strip = (kind, g, h) => {
+    const k = nTransP(h), st = h / k;
     for (let i=0; i<N; i++) for (let j=0; j<k; j++)
-      pts.push({id:nid(), kind:'p', g:l, long:D/2+i*D, trans:(j+.5)*st, lux:null, foto:null, hora:null});
+      pts.push({id:nid(), kind, g, long:D/2+i*D, trans:(j+.5)*st, lux:null, foto:null, hora:null});
   };
-  if (ls.includes(1)) passeio(1);
-  const vt = [cfg.L/6, cfg.L/2, 5*cfg.L/6];
-  for (let f=1; f<=cfg.faixas; f++) for (let i=0; i<N; i++) for (const t of vt)
-    pts.push({id:nid(), kind:'via', g:f, long:D/2+i*D, trans:t, lux:null, foto:null, hora:null});
-  if (ls.includes(2)) passeio(2);
+  for (const b of lay.bands) {   // de cima para baixo: passeio 1 → (ciclovia) → faixas (canteiro) → (ciclovia) → passeio 2
+    if (b.tipo === 'p' && b.existe) strip('p', b.g, b.h);
+    else if (b.tipo === 'c') strip('c', 1, b.h);
+    else if (b.tipo === 'v') for (let i=0; i<N; i++) for (const t of [b.h/6, b.h/2, 5*b.h/6])
+      pts.push({id:nid(), kind:'via', g:b.g, long:D/2+i*D, trans:t, lux:null, foto:null, hora:null});
+  }
   const agora = new Date().toISOString();
   if (novo || !state.id) {
     state = { id:novoId(), criado:agora, cfg, pontos:pts, salvoArquivo:null };
@@ -665,8 +709,8 @@ async function gerar(novo, silencioso){
 }
 
 /* ---------- Nomes ---------- */
-const grupoNome = p => p.kind === 'via' ? `Faixa ${p.g}` : `Passeio ${p.g}`;
-const areaNome = p => p.kind === 'via' ? `Via ${state.cfg.classeC}` : `Passeio ${state.cfg.classeP}`;
+const grupoNome = p => p.kind === 'via' ? `Faixa ${p.g}` : p.kind === 'c' ? 'Ciclovia' : `Passeio ${p.g}`;
+const areaNome = p => p.kind === 'via' ? `Via ${state.cfg.classeC}` : p.kind === 'c' ? `Ciclovia ${state.cfg.classeP}` : `Passeio ${state.cfg.classeP}`;
 
 /* ---------- Desenho ---------- */
 const SVG_CSS = `
@@ -687,35 +731,92 @@ const SVG_CSS = `
 .num.n3{font-size:9px}
 .luxl{fill:#fff;font:700 10px ui-monospace,Menlo,monospace;paint-order:stroke;stroke:#000;stroke-width:3px;text-anchor:middle;pointer-events:none}
 .cam{fill:#fff;stroke:#0d1b27;stroke-width:1.5}
+.pt.c .dot{fill:#9b4dca} .b-cic{fill:#b4554a} .b-park{fill:#454b52} .b-can{fill:#8fae7a}
+.stall{stroke:#eef1f3;stroke-width:1.6;fill:none} .stall.nd{stroke-dasharray:4 4;opacity:.55}
+.cicl{stroke:#fff;stroke-width:1.2;fill:none} .placa{fill:#1565c0;stroke:#fff;stroke-width:1.5} .placat{fill:#fff;font:800 11px system-ui,sans-serif;text-anchor:middle;dominant-baseline:central}
 `;
 document.head.insertAdjacentHTML('beforeend', `<style>${SVG_CSS}</style>`);
 
+const EST_PROF = {par:2.5, '45':4.5, '90':5};
+const EST_TXT = {par:'paralelo ao passeio', '45':'45°', '90':'90°'};
+const CIC_TXT = {p1:'junto ao passeio 1', p2:'junto ao passeio 2', can:'no canteiro central', f1:'na faixa 1', f2:'na faixa 2 (última)'};
+const SIN_TXT = {nao:'sem sinalização', h:'sinalização horizontal', v:'sinalização vertical', hv:'sinalização horizontal e vertical'};
+const cicOn = c => !!c && !!c.ciclo && c.ciclo !== 'nao' && c.Lciclo > 0;
+const canOn = c => !!c && c.canteiro === 'sim' && c.faixas >= 2 && c.Lcan > 0;
+const canApos = c => Math.min(c.faixas - 1, Math.max(1, c.canPos || Math.floor(c.faixas / 2)));
+/* Faixas transversais da seção, de cima (passeio 1) para baixo (passeio 2): p passeio · c ciclovia · e estacionamento · v faixa · k canteiro */
+function layout(c){
+  const F = c.faixas, L = c.L, ls = ladosDe(c.calc), has1 = ls.includes(1), has2 = ls.includes(2);
+  const wc = c.Lciclo > 0 ? c.Lciclo : 2, ci = cicOn(c) ? c.ciclo : null, can = canOn(c), apos = can ? canApos(c) : 0;
+  const es = c.estac && c.estac !== 'nao' ? c.estac : null, we = es ? (c.Lest > 0 ? c.Lest : EST_PROF[es]) : 0;
+  const el = es ? (c.estLado === 'ambos' ? [1, 2] : [c.estLado === '2' ? 2 : 1]) : [];
+  const bands = []; let y = 0;
+  const add = (tipo, g, h, x = {}) => { const b = {tipo, g, y0:y, h, ...x}; bands.push(b); y += h; return b; };
+  add('p', 1, has1 ? c.Lc1 : .5, {existe:has1});
+  if (ci === 'p1') add('c', 1, wc);
+  if (el.includes(1)) add('e', 1, we, {est:es});
+  for (let f = 1; f <= F; f++) {
+    if (ci === 'f1' && f === 1) add('c', 1, wc);
+    add('v', f, L - (ci === 'f1' && f === 1 ? wc : 0) - (ci === 'f2' && f === F ? wc : 0));
+    if (ci === 'f2' && f === F) add('c', 1, wc);
+    if (can && f === apos) { const k = add('k', 1, c.Lcan); if (ci === 'can') bands.push({tipo:'c', g:1, y0:k.y0 + (c.Lcan - wc) / 2, h:wc, dentro:true}); }
+  }
+  if (el.includes(2)) add('e', 2, we, {est:es});
+  if (ci === 'p2') add('c', 1, wc);
+  add('p', 2, has2 ? c.Lc2 : .5, {existe:has2});
+  return {bands, H:y};
+}
+function yPt(p, lay){   // posição transversal (m, a partir do topo da seção)
+  const t = p.kind === 'via' ? 'v' : p.kind === 'c' ? 'c' : 'p', b = lay.bands.find(b => b.tipo === t && b.g === p.g);
+  if (!b) return 0;
+  return p.kind === 'p' && p.g === 1 ? b.y0 + b.h - p.trans : b.y0 + p.trans;
+}
+function elementosTxt(c){
+  const t = [];
+  if (canOn(c)) t.push(`canteiro central ${fmt(c.Lcan)} m (após a faixa ${canApos(c)})`);
+  if (cicOn(c)) t.push(`ciclovia/ciclofaixa ${fmt(c.Lciclo)} m ${CIC_TXT[c.ciclo]}`);
+  if (c.estac && c.estac !== 'nao') t.push(`estacionamento ${EST_TXT[c.estac]} (${c.estLado === 'ambos' ? 'ambos os lados' : 'lado ' + (c.estLado === '2' ? 2 : 1)}, prof. ${fmt(c.Lest > 0 ? c.Lest : EST_PROF[c.estac])} m)`);
+  if (c.sinal && c.sinal !== 'nao') t.push(SIN_TXT[c.sinal]);
+  return t.join(' · ');
+}
 function svgMalha(){
   const {cfg, pontos} = state, em = estimarPendentes();
-  const L = cfg.L, F = cfg.faixas, S = cfg.S, N = calcN(S), D = S / N;
-  const ls = ladosDe(cfg.calc), has1 = ls.includes(1), has2 = ls.includes(2);
-  const w1 = has1 ? cfg.Lc1 : .5, w2 = has2 ? cfg.Lc2 : .5;
-  let minSp = L / 3;
-  if (has1) minSp = Math.min(minSp, cfg.Lc1 / nTransP(cfg.Lc1));
-  if (has2) minSp = Math.min(minSp, cfg.Lc2 / nTransP(cfg.Lc2));
+  const S = cfg.S, N = calcN(S), D = S / N, lay = layout(cfg), B = lay.bands;
+  let minSp = cfg.L / 3;
+  for (const b of B) { if ((b.tipo === 'p' && b.existe) || b.tipo === 'c') minSp = Math.min(minSp, b.h / nTransP(b.h)); if (b.tipo === 'v') minSp = Math.min(minSp, b.h / 3); }
   const sx = Math.max(40 / D, 820 / S);
   const sy = Math.min(100, Math.max(34, 40 / minSp));
   const mL = 92, mR = 26, mT = 58, mB = 22;
-  const W = Math.round(mL + S*sx + mR), H = Math.round(mT + (w1 + F*L + w2)*sy + mB);
-  const X = m => mL + m*sx;
-  const yR0 = mT + w1*sy, yR1 = yR0 + F*L*sy, yEnd = yR1 + w2*sy;
-  const bx = mL - 8, bw = S*sx + 16;
+  const W = Math.round(mL + S*sx + mR), H = Math.round(mT + lay.H*sy + mB);
+  const X = m => mL + m*sx, Y = m => mT + m*sy;
+  const bx = mL - 8, bw = S*sx + 16, yEnd = Y(lay.H);
+  const curb1 = Y(B[0].h), curb2 = Y(B[B.length-1].y0), roadH = (curb2 - curb1) / sy;
   let s = `<defs>
     <radialGradient id="glow"><stop offset="0" stop-color="#ffd54f" stop-opacity=".5"/><stop offset="1" stop-color="#ffd54f" stop-opacity="0"/></radialGradient>
     <pattern id="lajota" width="${(.5*sx).toFixed(1)}" height="${(.5*sy).toFixed(1)}" patternUnits="userSpaceOnUse">
       <rect class="walk" width="${(.5*sx).toFixed(1)}" height="${(.5*sy).toFixed(1)}"/>
       <path class="walkjoint" d="M0 0H${(.5*sx).toFixed(1)}M0 0V${(.5*sy).toFixed(1)}"/></pattern>
     <clipPath id="clipVia"><rect x="${bx}" y="${mT}" width="${bw}" height="${yEnd-mT}"/></clipPath></defs>`;
-  s += `<rect class="${has1?'b-walk':'b-verge'}" x="${bx}" y="${mT}" width="${bw}" height="${w1*sy}"/>`;
-  s += `<rect class="b-road" x="${bx}" y="${yR0}" width="${bw}" height="${F*L*sy}"/>`;
-  s += `<rect class="${has2?'b-walk':'b-verge'}" x="${bx}" y="${yR1}" width="${bw}" height="${w2*sy}"/>`;
-  for (let f=1; f<F; f++) { const y = yR0 + f*L*sy; s += `<line class="lane" x1="${bx}" x2="${bx+bw}" y1="${y}" y2="${y}"/>`; }
-  s += `<line class="curb" x1="${bx}" x2="${bx+bw}" y1="${yR0}" y2="${yR0}"/><line class="curb" x1="${bx}" x2="${bx+bw}" y1="${yR1}" y2="${yR1}"/>`;
+  const hz = cfg.sinal === 'h' || cfg.sinal === 'hv', vt = cfg.sinal === 'v' || cfg.sinal === 'hv';
+  const R = (cls, y, h) => `<rect class="${cls}" x="${bx}" y="${y}" width="${bw}" height="${h}"/>`;
+  const Ln = (cls, y) => `<line class="${cls}" x1="${bx}" x2="${bx+bw}" y1="${y}" y2="${y}"/>`;
+  B.forEach((b, i) => {
+    const y = Y(b.y0), h = b.h * sy;
+    if (b.tipo === 'p') s += R(b.existe ? 'b-walk' : 'b-verge', y, h) + Ln('curb', b.g === 1 ? y + h : y);
+    else if (b.tipo === 'v') { s += R('b-road', y, h); if (B[i-1] && B[i-1].tipo === 'v') s += Ln('lane', y); }
+    else if (b.tipo === 'k') s += R('b-can', y, h) + Ln('curb', y) + Ln('curb', y + h);
+    else if (b.tipo === 'c') s += R('b-cic', y, h) + Ln('cicl', y) + Ln('cicl', y + h);
+    else if (b.tipo === 'e') {
+      s += R('b-park', y, h);
+      const nd = hz ? '' : ' nd', top = b.g === 1, yc = top ? y : y + h, yo = top ? y + h : y;   // yc: lado do meio-fio · yo: lado da via
+      let g = '';
+      if (b.est === 'par') { for (let x = 0; x <= S + .01; x += 5.5) g += `<line class="stall${nd}" x1="${X(x)}" x2="${X(x)}" y1="${yc}" y2="${yo}"/>`; g += `<line class="stall${nd}" x1="${bx}" x2="${bx+bw}" y1="${yo}" y2="${yo}"/>`; }
+      else if (b.est === '90') for (let x = 0; x <= S + .01; x += 2.5) g += `<line class="stall${nd}" x1="${X(x)}" x2="${X(x)}" y1="${yc}" y2="${yo}"/>`;
+      else for (let x = -b.h; x <= S + .01; x += 3.5) g += `<line class="stall${nd}" x1="${X(x)}" x2="${X(x + (top ? b.h : -b.h))}" y1="${yc}" y2="${yo}"/>`;   // 45°: deslocamento horizontal = profundidade
+      s += `<g clip-path="url(#clipVia)">${g}</g>`;
+      if (vt) for (const x of [.8, S - .8]) s += `<rect class="placa" x="${X(x) - 9}" y="${yc - 9}" width="18" height="18" rx="3"/><text class="placat" x="${X(x)}" y="${yc}">E</text>`;
+    }
+  });
   s += `<rect class="area-l" x="${X(0)}" y="${mT}" width="${S*sx}" height="${yEnd-mT}"/>`;
   const yd = mT - 16;
   s += `<path class="dim" d="M${X(0)} ${yd}H${X(S)}M${X(0)} ${yd-6}V${yd+6}M${X(S)} ${yd-6}V${yd+6}"/>`;
@@ -726,22 +827,31 @@ function svgMalha(){
       ? `<text class="lbl" x="${mL-14}" y="${cy-3}" text-anchor="end">${a}</text><text class="lbl2" x="${mL-14}" y="${cy+11}" text-anchor="end">${b}</text>`
       : `<text class="lbl" x="${mL-14}" y="${cy+4}" text-anchor="end">${a}</text>`;
   };
-  s += has1 ? rot(mT, w1*sy, 'Passeio 1', fmt(cfg.Lc1)+' m') : rot(mT, w1*sy, 'Sem passeio 1', '');
-  for (let f=1; f<=F; f++) s += rot(yR0+(f-1)*L*sy, L*sy, 'Faixa '+f, fmt(L)+' m');
-  s += has2 ? rot(yR1, w2*sy, 'Passeio 2', fmt(cfg.Lc2)+' m') : rot(yR1, w2*sy, 'Sem passeio 2', '');
-  const arr = {u1:[[0,1],[S,1]], u2:[[0,2],[S,2]], bf:[[0,1],[S,1],[0,2],[S,2]], ba:[[0,1],[S,2]]}[cfg.postes] || [];
-  const armLen = Math.min(1.5, F*L/2) * sy, glowR = Math.min(F*L, 5) * sy;
+  const can = B.find(b => b.tipo === 'k'), cicCan = B.some(b => b.dentro);
+  for (const b of B) {
+    if (b.dentro) continue;
+    const y = Y(b.y0), h = b.h * sy;
+    if (b.tipo === 'p') s += b.existe ? rot(y, h, 'Passeio ' + b.g, fmt(b.h) + ' m') : rot(y, h, 'Sem passeio ' + b.g, '');
+    else if (b.tipo === 'v') s += rot(y, h, 'Faixa ' + b.g, fmt(b.h) + ' m');
+    else if (b.tipo === 'c') s += rot(y, h, 'Ciclovia', fmt(b.h) + ' m');
+    else if (b.tipo === 'k') s += rot(y, h, cicCan ? 'Canteiro + ciclovia' : 'Canteiro central', fmt(b.h) + ' m');
+    else if (b.tipo === 'e') s += rot(y, h, 'Estac. ' + (b.est === 'par' ? 'paral.' : b.est + '°'), fmt(b.h) + ' m');
+  }
+  const arr = {u1:[[0,1],[S,1]], u2:[[0,2],[S,2]], bf:[[0,1],[S,1],[0,2],[S,2]], ba:[[0,1],[S,2]], cc:can ? [[0,'c'],[S,'c']] : []}[cfg.postes] || [];
+  const w1p = B[0].h, w2p = B[B.length-1].h, armLen = Math.min(1.5, roadH/2) * sy, glowR = Math.min(roadH, 5) * sy;
   let glows = '', posts = '';
   arr.forEach(([x, lado]) => {
-    const px = X(x), py = lado === 1 ? yR0 - Math.min(.4, w1/2)*sy : yR1 + Math.min(.4, w2/2)*sy;
-    const ly = lado === 1 ? yR0 + armLen : yR1 - armLen;
+    const px = X(x);
+    if (lado === 'c') { const cy = Y(can.y0 + can.h/2); glows += `<circle class="glow" cx="${px}" cy="${cy}" r="${glowR}"/>`; posts += `<circle class="post" cx="${px}" cy="${cy}" r="6"/><circle class="lum" cx="${px}" cy="${cy}" r="7"/>`; return; }
+    const py = lado === 1 ? curb1 - Math.min(.4, w1p/2)*sy : curb2 + Math.min(.4, w2p/2)*sy;
+    const ly = lado === 1 ? curb1 + armLen : curb2 - armLen;
     glows += `<circle class="glow" cx="${px}" cy="${ly}" r="${glowR}"/>`;
     posts += `<line class="arm" x1="${px}" y1="${py}" x2="${px}" y2="${ly}"/><circle class="post" cx="${px}" cy="${py}" r="6"/><circle class="lum" cx="${px}" cy="${ly}" r="7"/>`;
   });
   s += `<g clip-path="url(#clipVia)">${glows}</g>` + posts;
   pontos.forEach((p, i) => {
     const cx = X(p.long).toFixed(1);
-    const cy = (p.kind === 'via' ? yR0 + ((p.g-1)*L + p.trans)*sy : (p.g === 1 ? yR0 - p.trans*sy : yR1 + p.trans*sy)).toFixed(1);
+    const cy = Y(yPt(p, lay)).toFixed(1);
     const med = p.lux != null, k = nro(p), est = !med && em.has(p.id) ? fmtEst(p, em.get(p.id)) : null;
     s += `<g class="pt ${p.kind}${med?' ok':''}${i===sel?' sel':''}${eqFora(p)?' fora':''}${p.conf?' conf':''}" data-i="${i}" tabindex="0" role="button" aria-label="Ponto ${k}, ${esc(grupoNome(p))}, ${med?fmtVal(p)+' '+unid(p):est?est+' '+unid(p):'pendente'}">
       <title>Ponto ${k} · ${esc(grupoNome(p))}${med?' · '+fmtVal(p)+' '+unid(p):est?' · '+est+' '+unid(p):''}</title>
@@ -765,9 +875,9 @@ function renderMalhaAgora(){
   const c = state.cfg, ls = ladosDe(c.calc);
   $('lgVia').textContent = `Via ${c.classeC}${isM() ? ' · luminância (cd/m²)' : ''}`;
   $('lgPed').textContent = `Passeio ${c.classeP}`;
-  $('lgPedWrap').hidden = !ls.length;
-  const nv = state.pontos.filter(p=>p.kind==='via').length, np = state.pontos.length - nv;
-  $('malhaInfo').textContent = `${state.pontos.length} pontos · ${nv} na via${ls.length?` · ${np} em passeio`:' · sem passeio'}`;
+  $('lgPedWrap').hidden = !ls.length; $('lgCicWrap').hidden = !cicOn(c);
+  const nv = state.pontos.filter(p=>p.kind==='via').length, nc = state.pontos.filter(p=>p.kind==='c').length, np = state.pontos.length - nv - nc;
+  $('malhaInfo').textContent = `${state.pontos.length} pontos · ${nv} na via${ls.length?` · ${np} em passeio`:' · sem passeio'}${nc?` · ${nc} na ciclovia`:''}`;
   $('malhaNote').textContent = isM()
     ? 'Classe M: os pontos da via recebem luminância (cd/m²), lida com o observador no centro da faixa, a 1,5 m de altura e 60 m antes da área de medição, no sentido do fluxo. Toque no ponto para registrar a leitura e a foto.'
     : 'Cada ponto mostra seu número. Toque no ponto para registrar a leitura e a foto; o mesmo número sai na foto, na tabela e nos arquivos.';
@@ -931,6 +1041,15 @@ function areasResumo(g = p => p.lux){
     out.push({titulo:`Passeio ${l} · ${c.classeP}`, st:sp, un:'lx', linhas:[
       {k:'Eméd', v:sp.n?fmt(sp.med)+' lx':'', r:`≥ ${fmt(rp.emed,1)} lx`, ok: sp.med >= rp.emed},
       {k:'Emín', v:sp.n?fmt(sp.min)+' lx':'', r:`≥ ${fmt(rp.emin,1)} lx`, ok: sp.min >= rp.emin},
+      {k:'Ev', v:'', r:`≥ ${fmt(rp.ev,1)} lx`, comp:true}
+    ]});
+  }
+  const cp = state.pontos.filter(p => p.kind === 'c');
+  if (cp.length) {
+    const sc = stats(cp, g);
+    out.push({titulo:`Ciclovia · ${c.classeP}`, st:sc, un:'lx', linhas:[
+      {k:'Eméd', v:sc.n?fmt(sc.med)+' lx':'', r:`≥ ${fmt(rp.emed,1)} lx`, ok: sc.med >= rp.emed},
+      {k:'Emín', v:sc.n?fmt(sc.min)+' lx':'', r:`≥ ${fmt(rp.emin,1)} lx`, ok: sc.min >= rp.emin},
       {k:'Ev', v:'', r:`≥ ${fmt(rp.ev,1)} lx`, comp:true}
     ]});
   }
@@ -1539,7 +1658,7 @@ function abrir(i){
   $('mInfo').innerHTML = `<dt>Via</dt><dd style="text-align:left;font-family:var(--f-ui)">${esc(c.via)}</dd>
     <dt>Coluna</dt><dd style="text-align:left;font-family:var(--f-ui)"><b>${ci.col}</b> de ${ci.N}${sentido}</dd>
     <dt>Longitudinal</dt><dd style="text-align:left">${fmt(p.long)} m da luminária inicial</dd>
-    <dt>Transversal</dt><dd style="text-align:left">${fmt(p.trans)} m ${p.kind==='via'?'da borda da faixa':'do meio-fio'}</dd>
+    <dt>Transversal</dt><dd style="text-align:left">${fmt(p.trans)} m ${p.kind==='via'?'da borda da faixa':p.kind==='c'?'da borda superior da ciclovia':'do meio-fio'}</dd>
     ${lum ? `<dt>Observador</dt><dd style="text-align:left;font-family:var(--f-ui)">Centro da faixa, 1,5 m de altura, 60 m antes da área, no sentido do fluxo</dd>` : ''}`;
   $('luxLbl').textContent = lum ? 'Luminância lida no luminancímetro (cd/m²)' : 'Iluminância lida no luxímetro (lx)';
   $('lux').placeholder = lum ? '0,00' : '0,0';
@@ -1580,7 +1699,8 @@ function colInfo(p){
 function ordemPontos(){
   const n = state.pontos.length, idx = [...Array(n).keys()];
   if (($('ordemNext') && $('ordemNext').value) !== 'col') return idx;
-  const g = p => p.kind === 'p' ? (p.g === 1 ? 0 : 1e6) : p.g;      // passeio 1 → faixas → passeio 2
+  const lay = layout(state.cfg);
+  const g = p => { const t = p.kind === 'via' ? 'v' : p.kind === 'c' ? 'c' : 'p', k = lay.bands.findIndex(b => b.tipo === t && b.g === p.g); return k < 0 ? 0 : k; };   // ordem das faixas, de cima para baixo
   const cols = new Map();
   for (const i of idx) { const k = colInfo(state.pontos[i]).col; if (!cols.has(k)) cols.set(k, []); cols.get(k).push(i); }
   const out = [];
@@ -1754,7 +1874,7 @@ function exportarCSV(){
   const em = estimarPendentes(), c = cfgExp(), q = x => '"' + String(x ?? '').replace(/"/g,'""') + '"';
   const n = (x,d) => x == null ? '' : Number(x).toFixed(d).replace('.', ',');
   const rows = [['Município','Via','Data','Responsável','Instrumento'].concat(eqUsa() ? ['Equipe'] : []).concat(['Nº','Área','Classe','Grupo','Longitudinal_m','Transversal_m','Valor','Unidade','Foto','Situação','Hora','Observações']).concat(state.estOn ? ['Valor_estimado'] : [], casoOn() || impN() || ocrN() ? ['Origem'] : [])];
-  state.pontos.forEach(p => rows.push([c.municipio, c.via, c.data, p.op || c.resp, p.instr || c.luximetro].concat(eqUsa() ? [p.eq || ''] : []).concat([nro(p), p.kind==='via'?'Via':'Passeio',
+  state.pontos.forEach(p => rows.push([c.municipio, c.via, c.data, p.op || c.resp, p.instr || c.luximetro].concat(eqUsa() ? [p.eq || ''] : []).concat([nro(p), p.kind==='via'?'Via':p.kind==='c'?'Ciclovia':'Passeio',
     p.kind==='via'?c.classeC:c.classeP, grupoNome(p), n(p.long,2), n(p.trans,2), n(p.lux,3), unid(p), p.foto?'Sim':'Não', p.lux != null ? 'Medido' : p.foto ? 'Só foto - conferir valor' : 'Pendente',
     p.hora ? new Date(p.hora).toLocaleString('pt-BR') : '', c.obs || ''].concat(state.estOn ? [p.lux == null && em.has(p.id) ? n(em.get(p.id), 3) : ''] : [], casoOn() || impN() || ocrN() ? [p.auto ? 'ilustrativo' : p.imp ? 'folha de campo' : p.lidoPor === 'ia' ? 'foto lida por IA (conferida)' : p.lidoPor === 'local' ? 'foto lida por OCR local (conferida)' : p.ocr ? 'visor lido pela câmera (conferido)' : p.lux != null ? 'medido' : ''] : []))));
   baixar(new Blob(['﻿' + rows.map(r => r.map(q).join(';')).join('\r\n')], {type:'text/csv;charset=utf-8'}), baseNome()+'.csv');
@@ -1806,7 +1926,7 @@ ${casoOn() ? `<div class="metodo" style="border-color:var(--bad)"><b>ESTUDO DE C
 <tr><td>Município</td><td>${esc(c.municipio)}</td></tr><tr><td>Via do trecho</td><td>${esc(c.via)}</td></tr>
 <tr><td>Data</td><td>${esc(c.data ? c.data.split('-').reverse().join('/') : '')}</td></tr><tr><td>Responsável</td><td>${esc(c.resp)}</td></tr>
 <tr><td>Instrumento</td><td>${eqInstrumentos().map(esc).join('<br>')}</td></tr>
-<tr><td>Geometria</td><td>S = ${fmt(c.S)} m · ${c.faixas} faixa(s) de ${fmt(c.L)} m · passeios: ${ls.length? ls.map(l=>`lado ${l} (${fmt(c['Lc'+l])} m)`).join(', ') : 'nenhum'}</td></tr>
+<tr><td>Geometria</td><td>S = ${fmt(c.S)} m · ${c.faixas} faixa(s) de ${fmt(c.L)} m · passeios: ${ls.length? ls.map(l=>`lado ${l} (${fmt(c['Lc'+l])} m)`).join(', ') : 'nenhum'}</td></tr>${elementosTxt(c) ? `<tr><td>Elementos da via</td><td>${esc(elementosTxt(c))}</td></tr>` : ''}
 <tr><td>Classes</td><td>Via ${c.classeC}${isM() ? ' (luminância, cd/m²)' : ' (iluminância, lx)'}${ls.length?` · Passeio ${c.classeP}`:''}</td></tr>
 <tr><td>Pontos medidos</td><td>${med} de ${state.pontos.length}</td></tr></table>
 ${eqRelHTML()}
@@ -2050,7 +2170,7 @@ async function montarPDF(){
   secao(2, 'Características da instalação');
   kv([['Distância entre luminárias S (m)', fmt(c.S)], ['Divisões longitudinais', `N = ${N} · D = ${fmt(D)} m`],
       ['Arranjo dos postes', posteOpt ? posteOpt.textContent : c.postes], ['Largura da faixa (m)', fmt(c.L)], ['Nº de faixas', String(c.faixas)],
-      ['Existência de passeio', LADO_TXT[c.calc] || c.calc], ...ls.map(l => [`Largura do passeio lado ${l} (m)`, fmt(c['Lc' + l])])]);
+      ['Existência de passeio', LADO_TXT[c.calc] || c.calc], ...ls.map(l => [`Largura do passeio lado ${l} (m)`, fmt(c['Lc' + l])]), ...(elementosTxt(c) ? [['Elementos da via', elementosTxt(c)]] : [])]);
 
   /* 3. Medições e resultados */
   secao(3, 'Medições e resultados');
@@ -3170,11 +3290,12 @@ $('btnLimpar').onclick = async () => {
 };
 document.querySelectorAll('input[name=calc]').forEach(r => r.onchange = () => { syncCalcUI(); checarDirty(); });
 ['S','L','faixas','Lc1','Lc2'].forEach(k => $(k).addEventListener('input', checarDirty));
+['canteiro','Lcan','canPos','ciclo','Lciclo','estac','estLado','Lest'].forEach(k => $(k).addEventListener('input', () => { syncElemUI(); checarDirty(); }));
 let tCfg = null;
-['municipio','via','data','resp','luximetro','postes','classeC','classeP','obs'].forEach(k => $(k).addEventListener('input', () => {
+['municipio','via','data','resp','luximetro','postes','classeC','classeP','sinal','obs'].forEach(k => $(k).addEventListener('input', () => {
   if (!state.cfg) return;
   state.cfg[k] = $(k).value.trim();
-  if (['postes','classeC','classeP'].includes(k)) renderTudo();
+  if (['postes','classeC','classeP','sinal'].includes(k)) renderTudo();
   clearTimeout(tCfg); tCfg = setTimeout(async () => { await salvar(); renderLevs(); }, 500);
 }));
 $('levs').addEventListener('click', e => {
@@ -3242,25 +3363,32 @@ function zipar(arq){
   f.setUint32(0, 0x06054b50, true); f.setUint16(8, arq.length, true); f.setUint16(10, arq.length, true); f.setUint32(12, cs, true); f.setUint32(16, off, true);
   return new Blob([...parts, ...cen, new Uint8Array(f.buffer)], {type:'application/zip'});
 }
-$('btnPacote').onclick = async () => {
+async function montarPacote(){
+  const raiz = baseNome(), te = new TextEncoder(), arq = [];
+  _cap = []; try { exportarCSV(); exportarRelatorio(); } finally { var cap = _cap; _cap = null; }
+  for (const [n, bl] of cap) arq.push([raiz + '/' + n, new Uint8Array(await bl.arrayBuffer())]);
+  arq.push([raiz + '/' + raiz + '.json', te.encode(jsonTexto())]);
+  let nf = 0;
+  for (const p of state.pontos) if (p.foto) {
+    const bs = atob(p.foto.split(',')[1]), u = new Uint8Array(bs.length); for (let i = 0; i < bs.length; i++) u[i] = bs.charCodeAt(i);
+    arq.push([raiz + '/fotos/ponto_' + String(nro(p)).padStart(3, '0') + '.jpg', u]); nf++;
+  }
+  return {blob:zipar(arq), nome:raiz + '.zip', nf};
+}
+async function exportarPacote(zap){
   if (!state.cfg) { toast('Nenhum levantamento aberto.'); return; }
-  const b = $('btnPacote'), t0 = b.textContent; b.disabled = true; b.textContent = 'Montando pasta…';
+  const b = $(zap ? 'btnPacoteZap' : 'btnPacote'), t0 = b.textContent; b.disabled = true; b.textContent = 'Montando pasta…';
   try {
-    const raiz = baseNome(), te = new TextEncoder(), arq = [];
-    _cap = []; try { exportarCSV(); exportarRelatorio(); } finally { var cap = _cap; _cap = null; }
-    for (const [n, bl] of cap) arq.push([raiz + '/' + n, new Uint8Array(await bl.arrayBuffer())]);
-    arq.push([raiz + '/' + raiz + '.json', te.encode(jsonTexto())]);
-    let nf = 0;
-    for (const p of state.pontos) if (p.foto) {
-      const bs = atob(p.foto.split(',')[1]), u = new Uint8Array(bs.length); for (let i = 0; i < bs.length; i++) u[i] = bs.charCodeAt(i);
-      arq.push([raiz + '/fotos/ponto_' + String(nro(p)).padStart(3, '0') + '.jpg', u]); nf++;
-    }
-    baixar(zipar(arq), raiz + '.zip');
-    toast(`Pacote salvo em Downloads: ${raiz}.zip (${nf} foto(s)). Extraia no app Meus Arquivos para criar a pasta.`, 7000);
+    const {blob, nome, nf} = await montarPacote();
+    if (!zap) { baixar(blob, nome); toast(`Pacote salvo em Downloads: ${nome} (${nf} foto(s)). Extraia no app Meus Arquivos para criar a pasta.`, 7000); return; }
+    const r = await compartilharComRetry(blob, nome, `Levantamento ${state.cfg.via || ''} — pasta completa`, [['application/zip', nome]]);
+    if (r === 'share') toast('Pasta enviada. Escolha o WhatsApp e o contato na janela de compartilhamento.', 5000);
+    else if (r === 'download') toast(`O Chrome não liberou o compartilhamento do .zip. Ele foi salvo em Downloads: no WhatsApp use Anexar › Documento › ${nome}.`, 9000);
   } catch(e) { _cap = null; toast('Não foi possível montar o pacote: ' + (e && e.message ? e.message : e), 7000); }
   finally { b.disabled = false; b.textContent = t0; }
-};
-
+}
+$('btnPacote').onclick = () => exportarPacote(false);
+$('btnPacoteZap').onclick = () => exportarPacote(true);
 
 /* ---------- Leitura das fotos no escritório (em lote) ----------
    Gera uma SUGESTÃO de valor (p.sug) para cada ponto com foto e sem valor. A sugestão não entra na conformidade:
@@ -3542,13 +3670,35 @@ function eqFora(p){
 }
 function eqCarimbar(p){ const e = eqLocal(); if (e.nome) p.eq = e.nome; if (e.op) p.op = e.op; if (e.instr) p.instr = e.instr; }
 /* ---------- arquivos: convite, minha parte, mesclar ---------- */
+/* Compartilhar arquivo (abre a lista de apps, com o WhatsApp). O Chrome do Android só libera alguns tipos de arquivo:
+   tenta o tipo real e, se recusado, um tipo aceito; se nada servir, salva em Downloads. */
+async function compartilharArquivo(blob, nome, titulo, tipos){
+  if (!navigator.share) return 'download';
+  let negado = false;
+  for (const [t, n] of tipos) {
+    try {
+      const f = new File([blob], n || nome, {type:t});
+      if (navigator.canShare && !navigator.canShare({files:[f]})) continue;
+      await navigator.share({files:[f], title:titulo, text:titulo}); return 'share';
+    } catch (e) {
+      if (e && e.name === 'AbortError') return 'cancel';
+      if (e && e.name === 'NotAllowedError') negado = true;   // o toque expirou (arquivo grande demorou a ficar pronto)
+    }
+  }
+  return negado ? 'gesto' : 'download';
+}
+async function compartilharComRetry(blob, nome, titulo, tipos){
+  let r = await compartilharArquivo(blob, nome, titulo, tipos);
+  if (r === 'gesto') {
+    const ok = await pedir('Arquivo pronto. Toque em “Compartilhar” para escolher o WhatsApp ou outro app.', [{t:'Compartilhar', v:true, cls:'primary'}, {t:'Salvar no aparelho', v:false}]);
+    r = ok ? await compartilharArquivo(blob, nome, titulo, tipos) : 'download';
+  }
+  if (r === 'download') baixar(blob, nome);
+  return r;
+}
 async function eqCompartilhar(texto, nome, titulo){
   const blob = new Blob([texto], {type:'application/json'});
-  try {
-    const f = new File([blob], nome, {type:'application/json'});
-    if (navigator.canShare && navigator.canShare({files:[f]})) { await navigator.share({files:[f], title:titulo, text:titulo}); return 'share'; }
-  } catch (e) { if (e && e.name === 'AbortError') return 'cancel'; }
-  baixar(blob, nome); return 'download';
+  return compartilharComRetry(blob, nome, titulo, [['application/json', nome], ['text/plain', nome + '.txt']]);
 }
 async function eqConvite(){
   if (!state.cfg) { toast('Nenhum levantamento aberto.'); return; }
